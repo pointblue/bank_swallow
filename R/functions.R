@@ -9,3 +9,8 @@ generate_data <- function() {
 fit_model <- function(data) {
   summary(lm(y ~ x, data = data))
 }
+
+render_Rmd = function(pathin, pathout) {
+  rmarkdown::render(pathin, 
+                    output_file = here::here(pathout))
+}
