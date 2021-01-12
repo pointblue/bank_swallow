@@ -37,16 +37,40 @@ plan <- drake_plan(
     mutate(month = format(`DATE TIME`, '%m') %>% as.numeric(),
            year = format(`DATE TIME`, '%Y') %>% as.numeric(),
            WY = if_else(month < 10, year, year + 1)),
-
-  # 4 stations are very well correlated; may be able to use just one
+  
+  # EXPLORE FLOW FOR ANY WATER YEAR:
+  # mflowdat %>% filter(WY == 2006) %>% 
+  #   ggplot(aes(`DATE TIME`, VALUE, color = STATION_ID)) + geom_line() +
+  #   geom_hline(aes(yintercept = 15000), color = 'red')
   
   # calculate indicator of stream power as the sum of daily mean flow > 425cms
-  # (~15000 cfs) by water year, based on VIN
-  VIN_cumpower = mflowdat %>% 
-    filter(STATION_ID == 'VIN' & VALUE > 15000) %>% 
-    group_by(WY) %>% 
-    summarize(power = sum(VALUE),
-              .groups = 'drop')
+  # (~15000 cfs) by water year, for each gauge
+  streampower = full_join(
+    mflowdat %>% group_by(STATION_ID, WY) %>% count() %>% ungroup(),
+    mflowdat %>% 
+      mutate(VALUE = VALUE - 15000,
+             VALUE = if_else(VALUE < 0, 0, VALUE)) %>%  
+      group_by(STATION_ID, WY) %>% 
+      summarize(power = sum(VALUE, na.rm = TRUE),
+                .groups = 'drop'),
+    by = c('WY', 'STATION_ID')) %>% 
+    filter(n >= 365),
+  
+  # EXPLORE STREAM POWER ACROSS YEARS & STATIONS:
+  # ggplot(streampower, aes(WY, power/1000000, color = STATION_ID)) + 
+  #   geom_line() + geom_point()
+  # streampower %>% filter(power < 250000 & STATION_ID == 'VIN') %>% arrange(power)
+  # # lowest years in 2020, 1994, 2014 (followed by 2018, 2012, 2007, 2008, 2001, 2009)
+  # 
+  # # check correlations
+  # corrplot::corrplot.mixed(
+  #   cor(streampower %>%
+  #         pivot_wider(names_from = 'STATION_ID', values_from = 'power') %>%
+  #         filter(WY > 2001) %>% select(-WY, -n),
+  #       method = 'pearson'),
+  #   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
+  # # --> 4 stations are very strongly correlated; may be able to use just one to
+  # # represent all (especially since HMC data not available until WY2002)
   
   # 2. Primary productivity---------
   
