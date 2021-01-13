@@ -74,8 +74,57 @@ plan <- drake_plan(
   
   # 2. Primary productivity---------
   
+  # consider NDVI or EVI from MODIS
+  processMODIS = MODIStsp::MODIStsp(
+    gui = FALSE, 
+    out_folder = "data/MODIS", 
+    selprod = "Vegetation_Indexes_16Days_250m (M*D13Q1)",
+    bandsel = c("EVI", "NDVI"), 
+    quality_bandsel = "QA_usef", 
+    indexes_bandsel = NULL, 
+    user = Sys.getenv('EARTHDATA_ID'),
+    password = Sys.getenv('EARTHDATA_PASSWORD'),
+    start_date = "2020.06.01", 
+    end_date = "2020.06.15", 
+    verbose = FALSE),
+  
   # 3. Winter weather------
   
+  # Lamanna et al. 2012 used El Nino as an indicator of winter survival,
+  # specifically the ESPI index (El Nino Precipitation index), described here: 
+  # https://psl.noaa.gov/enso/dashboard.html 
+  
+  espi = RCurl::getURL('http://eagle1.umd.edu/GPCP_ICDR/Data/ESPI.txt') %>% 
+    read_table() %>% 
+    select(year = YYYY, month = MM, ESPI),
+  
+  # consider also SOI: sign is opposite that of other indices, and noisier; no
+  # API, so manually downloaded from:
+  # https://psl.noaa.gov/gcos_wgsp/Timeseries/Data/soi.long.data
+  
+  soi = read_table('data/soi.csv', skip = 1, n_max = 155,
+                   col_names = c('year', '1', '2', '3', '4', '5', '6', '7', 
+                                 '8', '9', '10', '11', '12'),
+                   col_types = cols()) %>% 
+    pivot_longer(-year, names_to = 'month', values_to = 'SOI') %>% 
+    mutate(month = as.numeric(month),
+           SOI = if_else(SOI < -99, NA_real_, SOI)),
+  
+  # # EXPLORE RELATIONSHIP:
+  # inner_join(espi, soi) %>% ggplot(aes(ESPI, SOI)) + geom_point()
+  # 
+  # corrplot::corrplot.mixed(
+  #   cor(inner_join(espi, soi) %>% select(ESPI, SOI) %>% filter(!is.na(SOI)), method = 'pearson'),
+  #   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
+  # # negatively correlated, but not super tightly (-0.7)
+  # 
+  # inner_join(espi, soi) %>% 
+  #   mutate(date = as.Date(paste(year, month, '01', sep = '-'))) %>% 
+  #   filter(year>=2000 & year <=2010) %>% 
+  #   pivot_longer(ESPI:SOI) %>% 
+  #   ggplot(aes(date, value, color = name)) + geom_line()
+  
+
   # Analysis-----------
   
   
