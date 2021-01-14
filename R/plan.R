@@ -6,7 +6,25 @@ plan <- drake_plan(
                            file_out("README.md")),
   
   # Response variable--------
-  # BANS survey data
+  # BANS survey data from Greg
+  
+  birddat = readxl::read_excel(
+    file_in('data/from Greg/SR R2 and R3 BANS ACTIVE BURROWS and OUTFLOWS 1986-2020.xlsx'),
+    sheet = 2, range="A5:E38", 
+    col_types = c('numeric', 'skip', 'skip', 'skip', 'numeric'),
+    col_names = c('year', 'burrows')) %>% 
+    # calculate annual % change
+    mutate(agr = (burrows - lag(burrows)) / lag(burrows) * 100),
+  
+  # # EXPLORE:
+  # ggplot(birddat, aes(year, burrows)) + geom_line() + geom_point()
+  # # long-term cycles evident? steep decline through 1995, increase through 2001,
+  # # slower decline through 2015, then a rebound
+  # 
+  # ggplot(birddat, aes(year, agr)) + geom_line() + geom_point()
+  # # dramatic annual % changes, alternating + and - through 1996, then switches
+  # # to a pattern of steep increase, multi-year decrease through 2010, more
+  # # variable since
   
   # Predictors---------
   # Consider long-term trends, as well as direct and indirect (lagged) effects
@@ -45,16 +63,17 @@ plan <- drake_plan(
   
   # calculate indicator of stream power as the sum of daily mean flow > 425cms
   # (~15000 cfs) by water year, for each gauge
-  streampower = full_join(
-    mflowdat %>% group_by(STATION_ID, WY) %>% count() %>% ungroup(),
-    mflowdat %>% 
-      mutate(VALUE = VALUE - 15000,
-             VALUE = if_else(VALUE < 0, 0, VALUE)) %>%  
-      group_by(STATION_ID, WY) %>% 
-      summarize(power = sum(VALUE, na.rm = TRUE),
-                .groups = 'drop'),
-    by = c('WY', 'STATION_ID')) %>% 
-    filter(n >= 365),
+  streampower = mflowdat %>% group_by(STATION_ID, WY) %>% add_count() %>% 
+    ungroup() %>% filter(n >= 365) %>% 
+    # add threshold value
+    mutate(season = if_else(month >= 10 | month <= 3, 'rainy', 'dry'),
+           tVALUE = VALUE - 15000,
+           tVALUE = if_else(tVALUE < 0, 0, tVALUE)) %>%  
+    group_by(STATION_ID, WY, season) %>% 
+    summarize(totalflow = sum(VALUE, na.rm = TRUE),
+              streampower = sum(tVALUE, na.rm = TRUE),
+              .groups = 'drop'),
+  # --> consider seasonal flows (rather than total annual)
   
   # EXPLORE STREAM POWER ACROSS YEARS & STATIONS:
   # ggplot(streampower, aes(WY, power/1000000, color = STATION_ID)) + 
@@ -62,7 +81,7 @@ plan <- drake_plan(
   # streampower %>% filter(power < 250000 & STATION_ID == 'VIN') %>% arrange(power)
   # # lowest years in 2020, 1994, 2014 (followed by 2018, 2012, 2007, 2008, 2001, 2009)
   # 
-  # # check correlations
+  # # check correlations across stations
   # corrplot::corrplot.mixed(
   #   cor(streampower %>%
   #         pivot_wider(names_from = 'STATION_ID', values_from = 'power') %>%
@@ -71,10 +90,40 @@ plan <- drake_plan(
   #   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
   # # --> 4 stations are very strongly correlated; may be able to use just one to
   # # represent all (especially since HMC data not available until WY2002)
+  #
+  # RELATIONSHIP WITH TOTAL FLOW: very strong (+0.97)
+  # ggplot(streampower, aes(streampower, totalflow)) + geom_point()
+  # cor(streampower %>% select(totalflow:streampower))
+  
+  # EXPLORE DIRECT RELATIONSHIP TO BURROWS/AGR:
+  # left_join(streampower %>% filter(STATION_ID == 'VIN'),
+  #           birddat, by = c('WY' = 'year')) %>%
+  #   # ggplot(aes(streampower, burrows)) + geom_point() + ylim(0, 30000) # weak negative
+  #   # ggplot(aes(totalflow, burrows)) + geom_point() + ylim(0, 30000) # weak negative
+  #   # ggplot(aes(streampower, agr)) + geom_point() + ylim(-60, 60) #weak negative
+  #   ggplot(aes(totalflow, agr)) + geom_point() + ylim(-60, 60) #weak negative
+  
+  # EXPLORE LAGGED RELATIONSHIP TO BURROWS/AGR:
+  # left_join(streampower %>% filter(STATION_ID == 'VIN'),
+  #           birddat %>% mutate(WY = year - 1), by = 'WY') %>%
+  #   # ggplot(aes(streampower, burrows)) + geom_point() + ylim(0, 30000) # pretty flat
+  #   # ggplot(aes(totalflow, burrows)) + geom_point() + ylim(0, 30000) # pretty flat
+  #   # ggplot(aes(streampower, agr)) + geom_point() + ylim(-60, 60) # positive
+  #   # ggplot(aes(totalflow, agr)) + geom_point() + ylim(-60, 60) # positive
+  # 
+  # left_join(streampower %>% filter(STATION_ID == 'VIN'),
+  #           birddat %>% mutate(WY = year - 2), by = 'WY') %>% 
+  #   ggplot(aes(power, burrows)) + geom_point() + ylim(0, 25000) +
+  #   xlab('streampower, t-2') + ylab('burrows, t')
+  # # no obvious relationship
+  
   
   # 2. Primary productivity---------
   
   # consider NDVI or EVI from MODIS
+  
+  #--> figure out how to add bounding box or shapefile, and what output
+  # projection and resolution we need before testing this over a short timeframe!
   processMODIS = MODIStsp::MODIStsp(
     gui = FALSE, 
     out_folder = "data/MODIS", 
@@ -98,6 +147,14 @@ plan <- drake_plan(
     read_table() %>% 
     select(year = YYYY, month = MM, ESPI),
   
+  # # EXPLORE MONTHLY PATTERNS
+  # espi %>% group_by(year) %>% filter(ESPI == max(ESPI)) %>% 
+  #   ggplot(aes(month)) + geom_density(adjust = 0.25)
+  # # annual peak can be in any month; most frequent is Jan, Feb, Apr
+  # espi %>% group_by(year) %>% filter(ESPI == min(ESPI)) %>% 
+  #   ggplot(aes(month)) + geom_density(adjust = 0.25)
+  # # annual nadir can be in any month; most frequent is Feb, Apr (?)
+  
   # consider also SOI: sign is opposite that of other indices, and noisier; no
   # API, so manually downloaded from:
   # https://psl.noaa.gov/gcos_wgsp/Timeseries/Data/soi.long.data
@@ -110,7 +167,17 @@ plan <- drake_plan(
     mutate(month = as.numeric(month),
            SOI = if_else(SOI < -99, NA_real_, SOI)),
   
-  # # EXPLORE RELATIONSHIP:
+  # # EXPLORE MONTHLY PATTERNS
+  # soi %>% filter(year >= 1985) %>% 
+  #   group_by(year) %>% filter(SOI == max(SOI)) %>%
+  #   ggplot(aes(month)) + geom_density(adjust = 0.25)
+  # # annual peak most frequently in Feb
+  # soi %>% filter(year >= 1985) %>% 
+  #   group_by(year) %>% filter(SOI == min(SOI)) %>%
+  #   ggplot(aes(month)) + geom_density(adjust = 0.25)
+  # # annual nadir most frequently in June
+  
+  # EXPLORE RELATIONSHIP BETWEEN INDICES:
   # inner_join(espi, soi) %>% ggplot(aes(ESPI, SOI)) + geom_point()
   # 
   # corrplot::corrplot.mixed(
@@ -124,7 +191,49 @@ plan <- drake_plan(
   #   pivot_longer(ESPI:SOI) %>% 
   #   ggplot(aes(date, value, color = name)) + geom_line()
   
-
+  
+  # COMBINE THE TWO METRICS & SUMMARIZE
+  # seasonal metrics assumed to be June-Oct "rainy" and otherwise "dry"; for now
+  # explore "bioyear" as starting with start of rainy season in June, with the
+  # same number as the following BANS breeding season
+  climdat = inner_join(espi, soi, by = c('year', 'month')) %>% 
+    mutate(season = if_else(month >= 6 & month <= 10, 'rainy', 'dry'),
+           bioyear = if_else(month >= 6, year + 1, year)) %>% 
+    group_by(bioyear, season) %>% 
+    summarize(ESPI = mean(ESPI),
+              SOI = mean(SOI),
+              .groups = 'drop'),
+  
+  # ggplot(climdat, aes(bioyear, ESPI, color = season)) + geom_line()
+  # ggplot(climdat, aes(bioyear, SOI, color = season)) + geom_line()
+  # cor(climdat %>% select(bioyear:ESPI) %>% 
+  #       pivot_wider(names_from = 'season', values_from = 'ESPI') %>% 
+  #       select(-bioyear) %>% filter(complete.cases(.)))
+  # cor(climdat %>% select(bioyear:season, SOI) %>% 
+  #       pivot_wider(names_from = 'season', values_from = 'SOI') %>% 
+  #       select(-bioyear) %>% filter(complete.cases(.)))
+  # # ESPI and SOI during June-Oct rainy season strongly correlated with the
+  # # subsequent dry season (Nov-May) (+0.78 for both metrics)
+  
+  # EXPLORE RELATIONSHIP WITH #BURROWS/AGR:
+  # left_join(birddat, 
+  #           climdat %>% filter(season == 'rainy'), 
+  #           by = c('year' = 'bioyear')) %>% 
+  # ggplot(aes(ESPI, burrows)) + geom_point() #weak negative?
+  # ggplot(aes(SOI, burrows)) + geom_point() #very weak positive?
+  # ggplot(aes(ESPI, agr)) + geom_point() #weak negative?
+  # ggplot(aes(SOI, agr)) + geom_point() #weak positive?
+  
+  # LAGGED EFFECT?
+  # left_join(birddat %>% mutate(bioyear = year - 1),
+  #           climdat %>% filter(season == 'rainy'),
+  #           by = 'bioyear') %>%
+  # ggplot(aes(ESPI, burrows)) + geom_point() + ylim(0, 30000)
+  # ggplot(aes(SOI, burrows)) + geom_point() + ylim(0, 30000)
+  # ggplot(aes(ESPI, agr)) + geom_point() + ylim(-60, 60)
+  # ggplot(aes(SOI, agr)) + geom_point() + ylim(-60, 60) 
+  
+  
   # Analysis-----------
   
   
