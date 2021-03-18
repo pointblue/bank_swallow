@@ -144,170 +144,81 @@ plan <- drake_plan(
   # Compiled predictors----------------
   # check for correlations among predictors
 
-  modeldat = list(birddat %>% select(year, burrows, agr, pgr) %>% 
-                    mutate(burrows1 = lead(burrows)),
-                  # line up with current water year's flow data (starting the
-                  # previous October)
+  modeldat = list(birddat %>% select(year, burrows, pgr) %>% 
+                    mutate(burrows_tp1 = lead(burrows)),
+                  # keep flow14 data; line up with current water year's flow
+                  # data (starting the previous October)
                   mflow_sum %>% 
-                    select(year = WY, flow14_cum3, flow14_cum2, flow14_rainy, 
-                           flow14_breeding_early, flow14_breeding_late,
-                           flow14_annual) %>% 
-                    # add leading effects (from just before the next breeding season)
-                    mutate(flow14_breeding = flow14_breeding_early + flow14_breeding_late,
-                           flow14_cum31 = lead(flow14_cum3),
-                           flow14_cum21 = lead(flow14_cum2),
-                           flow14_rainy1 = lead(flow14_rainy),
-                           flow14_breeding1 = lead(flow14_breeding),
-                           flow14_breeding_early1 = lead(flow14_breeding_early),
-                           flow14_breeding_late1 = lead(flow14_breeding_late),
-                           flow14_annual1 = lead(flow14_annual)),
-                  # line up with current breeding season EVI
-                  cadat_sum %>% filter(metric == 'EVI') %>% 
-                    select(-SD) %>% 
-                    rename(year = WY) %>% 
-                    pivot_wider(names_from = c('metric', 'season'),
-                                values_from = Mean) %>% 
-                    # consider effects early in the next breeding season
-                    mutate(EVI_rainy1 = lead(EVI_rainy),
-                           EVI_breeding_early1 = lead(EVI_breeding_early),
-                           EVI_breeding_late1 = lead(EVI_breeding_late),
-                           EVI_breeding1 = lead(EVI_breeding)),
-                  drought_sum %>% filter(season == 'breeding') %>% 
-                    pivot_wider(names_from = 'index') %>% 
-                    select(year = WY, pdsi = pdsidv, zndx = zndxdv) %>% 
-                    mutate(pdsi1 = lead(pdsi),
-                           zndx1 = lead(zndx)),
-                  mxdat %>% filter(metric == 'EVI') %>% 
-                    select(year = WY, EVI_MX = Mean) %>% 
-                    mutate(EVI_MX1 = lead(EVI_MX))
+                    select(year = WY, flow14, flow14_3) %>% 
+                    # add leading effects (from year t+1, just before the next
+                    # breeding season)
+                    mutate(flow14_tp1 = lead(flow14),
+                           flow14_3_tp1 = lead(flow14_3)),
+                  drought_sum %>% select(year = WY, pdsi = pdsidv) %>% 
+                    mutate(pdsi_tp1 = lead(pdsi))
                   ) %>% 
     purrr::reduce(full_join) %>% 
     filter(year >= 1999),
   
-  # # exploratory plots:
-  # modeldat %>% select(pgr, year, burrows, burrows1:EVI_MX1) %>%
+  # # plot relationships with pgr:
+  # modeldat %>%
   #   mutate_at(vars(starts_with('flow')), ~log(. + 1)) %>%
-  #   pivot_longer(-pgr) %>%
-  #   ggplot(aes(value, pgr)) + geom_point() +
-  #   geom_smooth(method = 'gam') +
+  #   pivot_longer(-starts_with(c('year', 'pgr'))) %>%
+  #   ggplot(aes(value, pgr, color = year)) + geom_point() +
+  #   scale_color_viridis_c() +
+  #   geom_smooth(method = 'lm') +
   #   facet_wrap(~name, scales = 'free') +
   #   xlab(NULL)
-  # #
-  # # positive relationships with pgr:
-  # # - burrows1 (of course)
-  # # - EVI_breeding & EVI_breeding_late (not EVI_breeding_early); but few high values doing a lot of the work
-  # # - zndx_breeding (&early/late); pdsidv_breeding (& early/late)
-  # # - zndxdv_rainy (correlated with flow?)
-  # # - flow14_rainy, flow14_annual, flow14_cum21
-  # # - flow14_cum3 - slight
-  # # - flow14_breeding_late1 - slight - could flows reduce the burrow counts in t-1 so growth appears bigger?
-  # # - flow14_breeding (early & late) - nonlinear, increases at higher values
-  # #
-  # # negative relationship with pgr:
-  # # - burrows (density dependence)
-  # # - flow14_breeding_late1 - very slight -- reducing same-year burrow counts?
-  # # - flow14_rainy1 & flow14_annual1 - nonlinear; flattens/starts increasing again at high values;
-  # #    -->detrimental impacts of fresh cuts just before breeding season?
-  # 
-  # # nonlinear relationship with pgr:
-  # # - zndxdv_breeding_early1 - intriguing
-  # 
-  # # no apparent effects on pgr:
-  # # - EVI_breeding_early; EVI_breeding_early1; EVI_breeding_late1; EVI_breeding1
-  # # - EVI_MX, EVI_MX1
-  # # - EVI_rainy; EVI_rainy1
-  # # - zndxdv_rainy1; zndxdv_breeding_late1; pdsidv_breeding1; pdsidv_rainy1
-  # # - year
-  # # - flow14_cum3; flow14_cum31
-  # # - flow14_breeding1, flow14_breeding_early1
+  #
+  # positive relationships with pgr:
+  # - burrows_tp1 (of course)
+  # - flow14
+  # - flow14_3 (slight)
+  # - flow14_3_tp1 (slight)
+  # - pdsi
+  #
+  # negative relationship with pgr:
+  # - burrows (density dependence)
+  # - flow14_tp1 - but appears driven by 3 data points with unusually high
+  #    growth
+  # - pdsi_tp1 (slight)
+  #
+
   
+  # # plot relationships with #burrows: (carrying capacity?)
+  # modeldat %>%
+  #   mutate_at(vars(starts_with('flow')), ~log(. + 1)) %>%
+  #   pivot_longer(-starts_with(c('year', 'burrows'))) %>%
+  #   ggplot(aes(value, burrows, color = year)) + geom_point() +
+  #   scale_color_viridis_c() +
+  #   geom_smooth(method = 'lm') +
+  #   facet_wrap(~name, scales = 'free') +
+  #   xlab(NULL)
+  # positive relationship with #burrows: 
+  # - flow14_3
+  # - flow14_3_tp1 (very slight)
+  # - flow14_tp1 (very slight)
+  #
+  # negative relationship:
+  # - pgr
+  # - flow14 (slight)
+  # - pdsi (slight)
+  # - pdsi_tp1 (slight)
+
   
   # # check correlations with birddat & across metrics (log-transform flow metrics)
   # corrplot::corrplot.mixed(
-  #   cor(modeldat %>% dplyr::select(-year) %>%
-  #         mutate_at(vars(starts_with('flow')), ~log(.+1)) %>%
-  #         mutate(agr = log(agr)) %>% drop_na(),
+  #   cor(modeldat %>% mutate_at(vars(starts_with('flow')), ~log(.+1)) %>%
+  #         drop_na(),
   #       method = 'pearson'),
   #   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
-  # # positive correlations:
-  # # - flow14_annual/rainy & pgr/agr (0.68/0.68)
-  # # - EVI_breeding_late & pgr (0.62)
-  # # - flow14_rainy & flow14_annual (0.98)
-  # # - ca_evi/ca_evi1 (0.86) (due to trend; correlation weaker when detrended)
-  # # - flow14_breeding & flow14_breeding_early (0.88); with flow14_breeding_late (0.67)
-  # # - flow14_cum3 & burrows1 (0.84) [but not agr/pgr] - reflects cumulative effect of flow14_rainy1
-  # 
-  # # negative correlations:
-  # # - burrows & EVI_MX (-0.7); burrows1 & EVI_MX [but not agr/pgr]
-  # # - flow14_cum3 & EVI_MX1 (-0.62) --> does this explain the apparent burrows/EVI_MX negative correlation?
-  # #    --> negative relationship between wet winters in CA and MX? SOI?
-
-  # corrplot::corrplot.mixed(
-  #   cor(modeldat %>% dplyr::select(-year) %>%
-  #         mutate_at(vars(starts_with('flow')), ~log(.+1)) %>%
-  #         mutate(agr = log(agr)) %>% drop_na(),
-  #       method = 'spearman'),
-  #   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
-  # # positive correlations:
-  # # - flow14_rainy & agr/pgr (0.65)
-  # # - flow14_cum3 & burrows1 (0.83)
-  # # - ca_evi & ca_evi1 (0.83) - autocorrelation (trend)
-  # # negative correlations:
-  # # - strongest is agr/pgr & burrows (-0.57) - some density dependence? or
-  # # potential for growth is limited with #burrows already high
-
-  
-  # subset of predictors:
-  modeldat %>%
-    select(pgr, burrows, year,
-           flow14_annual, flow14_annual1, flow14_cum3, flow14_breeding_early1,
-           EVI_breeding, zndx, zndx1, pdsi, pdsi1,
-           EVI_MX, EVI_MX1) %>%
-    mutate_at(vars(starts_with('flow')), ~log(. + 1)) %>%
-    pivot_longer(-pgr) %>%
-    ggplot(aes(value, pgr)) + geom_point() +
-    geom_smooth(method = 'gam') +
-    facet_wrap(~name, scales = 'free_x') +
-    xlab(NULL)
-  # pgr (t to t+1) positively related to EVI_breeding, flow14_annual, pdsi, zndx (slight)
-  # and negatively related to burrows, flow14_annual1 (nonlinear)
-
-  # modeldat %>%
-  #   select(pgr, burrows1, year,
-  #          flow14_annual, flow14_annual1, flow14_cum3, flow14_breeding_early1,
-  #          EVI_breeding, zndx, zndx1, pdsi, pdsi1,
-  #          EVI_MX, EVI_MX1) %>%
-  #   mutate_at(vars(starts_with('flow')), ~log(. + 1)) %>%
-  #   pivot_longer(-burrows1) %>%
-  #   ggplot(aes(value, burrows1)) + geom_point() +
-  #   geom_smooth(method = 'gam') +
-  #   facet_wrap(~name, scales = 'free_x') +
-  #   xlab(NULL)
-  # burrows(t+1) positively related to flow14_cum3, pgr, flow14_annual
-  # and negatively related to EVI_MX/EVI_MX1, year (but nonlinear)
-  # 
-  # corrplot::corrplot.mixed(
-  #   cor(modeldat %>%
-  #         select(pgr, burrows, burrows1, year,
-  #                flow14_annual, flow14_annual1, flow14_cum3, flow14_breeding_early1,
-  #                EVI_breeding, zndx, zndx1, pdsi, pdsi1,
-  #                EVI_MX, EVI_MX1) %>%
-  #         mutate_at(vars(starts_with('flow')), ~log(.+1)) %>%
-  #         drop_na(),
-  #       method = 'spearman'),
-  #   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
-  # positive correlations:
-  # - EVI_breeding & year (0.87)
-  # - EVI_MX & year (0.59)
-  # - flow14_annual & pgr (0.68)
-  # - zndx & pdsi (0.91)
+  # strong positive correlations:
+  # - flow14_3 & burrows_tp1 (0.84)
+  # - pgr & flow14 (0.7)
   #
-  # # negative correlations:
-  # - pgr & burrows (-0.57)
-  # - EVI_MX & burrows (-0.59) (because of increasing trend?)
-  # - year & burrows (-0.54)
+  # strongest negative correlation:
+  # - burrows & year (-0.6)
 
-  
   # ANALYSIS-----------
   # 1. growth rate----------
   # may be easier than modeling N because it can possibly avoid autocorrelation
