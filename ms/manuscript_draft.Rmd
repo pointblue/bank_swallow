@@ -1,0 +1,165 @@
+---
+title: "Draft manuscript"
+author: |
+  | Gregory H. Golet$^1$, Kristen E. Dybala$^2$, Author 3 $^3$, Author 4 $^4$
+  | $^1$The Nature Conservancy, Chico, CA USA
+  | $^2$Point Blue Conservation Science, Petaluma, CA USA
+  | $^3$Affiliation 3
+date: "Last updated: `r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    df_print: paged
+  pdf_document:
+    fig_caption: yes
+    number_sections: yes
+  word_document: default
+geometry: margin = 1in
+header-includes:
+  - \usepackage{setspace}\doublespacing
+  - \usepackage[left]{lineno}
+  - \linenumbers
+keywords: 
+bibliography: Q:/Petaluma/kdybala/Documents/ResearchZettl/DybalaZoteroLibrary.json
+csl: C:/Users/kdybala/Zotero/styles/council-of-science-editors-author-date.csl
+abstract: |
+   XXX optional abstract here.
+---
+# INTRODUCTION
+
+* Bank Swallow background, conservation need
+
+* Prior research findings; gaps in research and need for this study 
+  * a lot of prior Sacramento Valley research on colony size dynamics and probability of colonization/extinction/persistence of individual colonies as opposed to total population size (with the exception of PVAs)
+  * evidence for effects of river flow/management on Bank Swallow population dynamics mixed, but focused on the immediate effects of flow on population size the following breeding season:
+     * probability of colonization & extinction both increased with max river discharge in the previous year (March 15-March 14), but suggested a net positive (@wrightBurrowOccupancyNesting2011)
+     * mean winter flow and peak flow (Dec-Apr) were both poor predictors of the number of colonies and their size (# of burrows) (@garciaSpatialTemporalPatterns2009)
+  * there is a need to consider time-lagged/indirect effects of flows on reproductive success and subsequent growth in the population size
+  
+* Approach and objectives
+  * evaluate long-term trends and the role of stream flow in Bank Swallow population dynamics, incorporating time-lagged effects and looking at the entire Bank Swallow population as a whole
+
+# METHODS
+
+## Study area & study species
+* Map?
+* Climate, hydrology, definition of "water year" (i.e. BANS breeding season takes place toward the end of the water year, and follows the rainy season)
+* Breeding biology, timing, migratory status, conservation status, diet
+* Assumption that the number of burrows counted is a useful index of population size
+
+## Bird surveys
+* survey methods, timing
+* variations in protocol over time
+* focusing this analysis on surveys since 1999
+
+## Conceptual model and hypotheses
+
+We developed a conceptual model illustrating hypothesized effects of environmental covariates and density dependence on Bank Swallow population dynamics, through their effects on survival and reproductive success (*Figure X*). We assumed that the per-capita population growth rate in the number of Bank Swallow burrows between subsequent breeding seasons t and t+1 was directly influenced by reproductive success in year t and/or by survival during the non-breeding season between years t and t+1. Studies of the dynamics of Bank Swallow populations that migrate between Europe and Africa have found strong effects of adult survival (@normanDensitydependentSurvivalRecruitment2013; @imlayBreedingPhenologyPerformance2018), which is in turn driven by patterns of drought and subsequent food availability during the non-breeding season (@cowleyLongtermVariationSurvival2005; @normanDensitydependentSurvivalRecruitment2013;  @mondain-monvalClimaticConditionsMigration2020a). In contrast, reproductive success had a strong impact on the dynamics of a population that migrates between the northeastern United States and South America (@imlayBreedingPhenologyPerformance2018). Although reproductive success in Bank Swallows is not generally expected to be food-limited (@garrisonBankSwallowRiparia1998), drought conditions could affect food availability and nestling survival, particularly in California's Mediterranean climate (@dybalaProjectingDemographicResponses2013). In addition, breeding performance is likely to be driven by variation in quantity and quality of available nesting habitat (@girvetzRemovingErosionControl2010). 
+
+On the Sacramento River, Bank Swallows establish nest colonies on steep river banks formed by periods of high river flow with sufficient power to cause bank erosion. Continual erosion is necessary to create and maintain high quality nesting habitat; freshly eroded cut banks less than 2-3 years old tend to have steeper slopes that limit predator access to nest burrows (especially gopher snakes), and less opportunity for a build up of parasite loads that reduce reproductive success (@garrisonBankSwallowRiparia1998; @garciaSpatialTemporalPatterns2009). Installation of revetment to eliminate erosion on river banks permanently removes potential nesting habitat from the Sacramento River system. 
+
+For this study, we focused on the role of environmental conditions and population density on reproductive success and subsequent variation in the population growth rate. We hypothesized that: 
+  1) reproductive success in water year (t) would be higher following winter rainy seasons (during water year t) with more high flows and bank erosion. High flows would increase the quantity of freshly cut, high quality nest habitat. 
+  2) reproductive success in water year (t) would be higher following more periods of more total high flows over the previous 3 years (during water years t-2 to t). Consecutive years of high flows would expand the total quantity of suitable nesting habitat, or carrying capacity, of the study area. Because reproductive success may be density-dependent, with fecundity assumed to be lower in large Bank Swallow colonies (@girvetzRemovingErosionControl2010), we assumed a larger carrying capacity would minimize any effects of density dependence on reproductive success and allow for more population growth from water year t to t+1. 
+  3) reproductive success in water year (t) would be lower under drought conditions, due to potentially limited food availability.
+
+We were unable to address the effects of changes in the amount of revetment in the study area, or of environmental conditions during the non-breeding season and impacts on survival rates. Although much of the revetment in the study area has been mapped, annual totals of the extent of revetment have not been compiled for this study period. In addition, data on migratory connectivity for this population are as yet unavailable. Thus, we incorporated a term in our model to account for unidentified sources of variation. However, we note that this modeling effort could be readily revised to incorporate these and other data as they become available.
+
+## Covariates
+
+To represent each of our hypotheses, we compiled data on Sacramento River flow and regional drought indices. River flows above a threshold of approximately 14-15,000 cfs are directly associated with bank erosion and increased availability of suitable nesting habitat for Bank Swallows (@larsenCumulativeEffectiveStream2006; bans-tacBankSwallowRiparia2013). Thus, following Larsen et al. (@larsenCumulativeEffectiveStream2006), we compiled daily mean stream flow data from USGS river gauges (https://cdec.water.ca.gov/dynamicapp/wsSensorData) and calculated the sum total of the daily mean flow above a threshold value during a given water year (Oct 1 - Sept 30). We used a threshold of 14,000 cfs, consistent with recommendations from the Bank Swallow Technical Advisory Committee (@bans-tacBankSwallowRiparia2013) and slightly lower than the 425 cms (~15,000 cfs) used by Larsen et al. (2006). 
+
+We used four river gauges that spanned the length study area: Vina Bridge (VIN), Hamilton City (HMC), Ord Ferry (ORD), and Butte City (BTC) [*show on map?*]. For each gauge, we calculated the annual flow totals, and then because the four stations were highly correlated with each other, we calculated the mean value across all four stations (*annual_flow*). Because the vast majority of the high water flow events occur during the winter rainy season, *annual_flow* represents the erosion occurring during the winter just prior to the Bank Swallow breeding season, and we used this value as a covariate representing Hypothesis 1. We then calculated the cumulative sum total of these values for a given water year and two previous water years (*cumulative_flow*), and used this value as a covariate representing Hypothesis 2. 
+
+Finally, to represent Hypothesis 3, we compiled monthly values for the Palmer Drought Severity Index (PDSI) from NOAA for the "Sacramento Drainage" climate division in California. The PDSI incorporates monthly temperature, precipitation, and soil-water holding capacity data to represent the severity of dry and wet spells, with values of 2 and higher considered moist and values of -2 and lower considered to represent drought (Palmer 1965). For each water year, we calculated the mean of the monthly PDSI values for the Bank Swallow breeding season, April through August (*mean_PDSI*). [*Does it make sense to use these regional indices as opposed to something more closely tied to the area near the colonies? Also looked at EVI, but long-term trend complicates things...*]
+
+* primary productivity data (EVI) from NASA MODIS via AppEEARS, summarized within 1km of nest colonies, for XX months
+
+For each of these three covariates, we centered and scaled the annual values to have a mean zero and standard deviation equal to the range between the maximum and minimum values. **We also centered and scaled the burrow counts by subtracting 15,000 burrows and dividing by 10,000.**
+
+## Population model
+
+To evaluate the relative importance of each of our hypotheses, we modeled the observed per-capita population growth rate from year *t* to year *t + 1* (r[t]) as:
+
+$$ r_t \sim Normal(\mu_{rt}, \sigma_o^2) $$ (1)
+
+$$ \mu_{rt} = r_0 + k_t * N_t + \beta_1 * annual.flow_t + \beta_2 * pdsi_t + \beta_3 * t + \epsilon_t $$ (2)
+
+$$ \epsilon_t \sim Normal(0, \sigma_p^2) $$ (3)
+
+where $r_0$ represents the intrinsic growth rate of the population, $N_t$ is the observed burrow count in each year, $k_t$ represents the strength of the density-dependent effect on $r_0$ in each year, and $\beta_1$ and $\beta_2$ represent the effects of *annual.flow* and *pdsi* on $r_0$. In addition, we incorporated $\beta_3$ to account for any long-term trend in the population growth rate, and $\epsilon_t$ to account for additional unidentified sources of variation in the growth rate. We treated $\epsilon_t$ as a mean-zero normal random variable with constant variance $\sigma_p^2$,
+
+We modeled the strength of the density dependent effect, $k_t$, as a function of explanatory variables:
+
+$$ k_t \sim Normal(\mu_{kt}, \sigma_k^2)$$ (4)
+
+$$ mu_{kt} = k_0 + k_1 * cumulative.flow_t$$ (5)
+
+where $k_0$ is the effect of density dependence during a year of average cumulative flow, and $k_1$ is the effect of cumulative flow on the strength of density dependence.
+
+We estimated the posterior distributions for all model parameters using Markov chain Monte Carlo (MCMC) implemented in JAGS 4.0.0 using the R package *rjags* (Plummer 2003, 2018; R Core Team, 2015). We used vague normal prior distributions for parameters $r_0$, $k_1$, and all $\beta$ (mean 0, variance 10^3). We used a vague uniform prior distribution for $k_0$ (ranging -5 to 5) and all variances, $\sigma_o^2$, $\sigma_p^2$, and $\sigma_k^2$ (ranging 0 to 2).
+
+We fit 3 chains, each with 50,000 initial samples discarded for adaptation and burn-in. We accumulated an additional 600,000 samples from each chain, retaining every 200th sample. We evaluated convergence of the three chains using the Gelman-Rubin diagnostic (Gelman and Rubin 1992, r < 1.05) and visually inspecting the trace plots. We also used posterior predictive checks to confirm that our observed data fit our model well, by comparing characteristics of the observed population growth rate data to simulated data generated within the model for each sample of the parameter estimates. Specifically, we calculated the proportion of samples for which the mean and standard deviation for the simulated data were larger than the observed data and we confirmed that these proportions (also called Bayesian p-values) were near 0.5, indicating good model fit (mean: p = 0.50, standard deviation: p = 0.73; *check ref: Gelman et al, 2014*).
+
+We report the medians and 95% highest posterior density intervals (HPDI) for all model parameters **and derived quantities**, as well as the proportion of samples for which model parameters *beta.1*, *beta.2*, *beta.3*, *k1*, and *k0* were greater than or less than zero, which is directly interpreted as the probability that the parameter is non-zero.
+
+Gelman A, Hwang J, Vehtari A. 2014. Understanding predictive information criteria for Bayesian models. Statistics and Computing 24:997–1016.
+
+* **Hold out the last X years to predict??**
+
+# RESULTS
+
+## Bird surveys
+* Summary of burrow count change/pgr overall and during the specific study period (1999-2020)
+* Figure?
+
+## Environmental data
+* Summary of covariates, statistics, trends/variance
+* Figures?
+* Stats table?
+
+## Population modeling
+* Probability of a non-zero effect of each predictor
+* Size and direction of effect
+* Predicted values over a range of each predictor? (Figures?)
+
+
+# DISCUSSION
+
+* no info on migratory connectivity for this population
+* role of revetment; incorporating that info would be helpful
+
+# Acknowledgements
+XXX
+
+# Author contributions
+XXX
+
+# Data availability statement
+XXX
+
+\clearpage
+
+\newpage
+# Figures and Tables
+
+Table 1. Summary of predictor variables, with ranges/means/stats
+
+
+\clearpage
+
+\newpage
+<!-- ![](../ms_figs/fig_1.png){ width=100% } -->
+**Figure 1: Map of study area.**
+* With burrow locations?
+* With breeding/wintering range?
+
+\clearpage
+
+\newpage
+<!-- ![](../ms_figs/fig_2.png){ width=100% } -->
+<!-- **Figure 2:**  -->
+\clearpage
+
+# Supplementary Materials
+
+# References
