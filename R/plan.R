@@ -5,90 +5,48 @@ plan <- drake_plan(
   readme_page = render_Rmd(file_in("Rmd/README.Rmd"),
                            file_out("README.md")),
   
-  # RESPONSE--------
-  # BANS survey data from Greg: annual burrow counts between river miles 144-243
-  # (roughly Colusa to Red Bluff)
-  
-  # From Greg: Pre 1999 data have not be error proofed in the same way as latter
-  # data, and yes some of the methods were different. For example surveys
-  # weren’t completed in just a few days in one concerted effort like since
-  # 1999. Instead they were done over the course of the summer, which would
-  # certainly affect counts. I wasn’t involved in surveys back then.  I think
-  # for the most part we should only analyze data from 1999 onwards.
-  
-  # > Burrow counts are the average of two separate counters' totals.
-  
-  birddat = readxl::read_excel(
-    file_in('data/BANS/SR R2 and R3 BANS ACTIVE BURROWS and OUTFLOWS 1986-2020.xlsx'),
-    sheet = 2, range="A5:E38", 
-    col_types = c('numeric', 'skip', 'skip', 'skip', 'numeric'),
-    col_names = c('year', 'burrows')) %>% 
+  # RESPONSE DATA--------
+  # BANS survey data: annual burrow counts between river miles 144-243 (roughly
+  # Colusa to Red Bluff); counts are the average of two separate counters'
+  # totals, so sometimes not an integer; survey protocols changed ~1999, so
+  # analysis focuses on data from 1999 onward
+
+  birddat = read_csv('data/BANS_burrow_counts.csv', col_types = cols()) %>% 
     # check for / fill in any missing years
     complete(year = seq(min(year), max(year))) %>%
-    # calculate annual change to the following year
+    # calculate annual per-capita growth rate as the change in burrow count to
+    # the following year
     mutate(agr = lead(burrows)/burrows,
            pgr = (lead(burrows) - burrows)/burrows),
   # Note: no count data from 2006, so no agr/pgr calculated for 2005-06
   # interval, or 2006-07 interval
 
-  # > any evidence for density dependence?
-  # # when #burrows is higher (> ~14k), growth to the following year tends to be
-  # # <1; relationship seems fairly linear, but not super strong
-  # ggplot(birddat, aes(burrows, agr)) + geom_point() +
-  #   geom_hline(aes(yintercept = 1), color = 'red') +
-  #   geom_smooth(method = 'gam', formula = y ~ s(x, bs = 'cs')) +
-  #   scale_y_log10()
-  # ggplot(birddat, aes(burrows, pgr)) + geom_point() +
-  #   geom_hline(aes(yintercept = 0), color = 'red') +
-  #   geom_smooth(method = 'gam', formula = y ~ s(x, bs = 'cs'))
-  
-  # PREDICTORS---------
-  # Consider long-term trends in population growth rate, as well as direct and
-  # indirect (lagged) effects of environmental conditions on nest success,
-  # survival, and immigration/recruitment
-  
-  # 1. Stream flow-----------
-  # high flows cause bank erosion which creates new colony sites, but also
-  # destroys existing colony sites; timing matters for impacts on the breeding
-  # population: during winter = good for nest site availability (carrying
-  # capacity, immigration/recruitment) and quality (nest success), during
-  # breeding = bad (nest success)
+  # COVARIATES---------
+  # Focus on effects of environmental conditions on reproductive success, and
+  # subsequent growth to the following year; consider also density-dependence
 
-  # Proposed metrics: total flow, flow above a certain cfs (related to "stream
-  # power")
-  
-  # > river gauge data----------
-  
-  # - Larsen et al. (2006) used daily mean stream flow from USGS, sum total
-  # above flow threshold of 425cms (~15,000 cfs) during a given water year (Oct
-  # 1-Sept 30)
-  # - BANS-TAC report indicates flows >50,000 cfs can cause widespread erosion
-  # and loss of multiple colonies (but beneficial during nonbreeding season);
-  # lower breeding season flows between 14,000-30,000 cfs can cause
-  # local/partial colony collapses and elevated river stage can cause nest
-  # failure; breeding season: Apr 1-Aug 31
-  
-  # no available API/token, so manually downloaded hourly and mean daily and
-  # flow data for each gauge from:
+  # 1. Nest habitat quantity & quality-----------
+  # total daily mean flow above a threshold is proportional to stream power and
+  # extent of erosion, increasing the quantity and quality of nest habitat;
+  # thresholds considered: 14000 cfs and 50000 cfs; 14-15,000 cited as a
+  # threshold above which erosion occurs; 50,000 cfs cited as causing widespread
+  # erosion throughout the system (Larsen et al. 2006; BANS-TAC 2013)
+
+  # > manually download mean daily flow data for each gauge from:
   # https://cdec.water.ca.gov/dynamicapp/wsSensorData
-  # -->(hourly flow data full of missing data points and times when flow was
-  # above/below the rating table; assume mean daily flow data has accounted for
-  # some of this?)
 
   # relevant gauges (N to S): 
-  # - Vina Bridge (VIN): mean daily flow data available from 1993-01-01; hourly flow from 1985-10-01
-  # - Hamilton City (HMC): mean daily flow available from 2001-01-01; hourly from 1991-06-19
-  # - Ord Ferry (ORD): mean daily flow available from 1993-01-01; hourly from 1985-10-01
-  # - Butte City Gauge (BTC): available from 1993-01-01
-  # - Moulton Weir: no mean daily flow data? hourly available from 1998-01-28
-  
+  # - Vina Bridge (VIN): data available from 1993-01-01
+  # - Hamilton City (HMC): data available from 2001-01-01
+  # - Ord Ferry (ORD): data available from 1993-01-01
+  # - Butte City Gauge (BTC): data available from 1993-01-01
+
   mflowdat = compile_waterdat(dir = file_in('data/CDEC'), type = 'MFLOW',
                               col_types = cols()) %>% 
+    select(STATION_ID, `DATE TIME`, VALUE) %>% 
     mutate(VALUE = if_else(VALUE == '---' | VALUE < 0, NA_character_, VALUE),
-           VALUE = as.numeric(VALUE)) %>% 
-    mutate_at(vars(STATION_ID, DURATION, SENSOR_TYPE, UNITS), as.factor) %>% 
-    # add water year
-    mutate(month = format(`DATE TIME`, '%m') %>% as.numeric(),
+           VALUE = as.numeric(VALUE),
+           month = format(`DATE TIME`, '%m') %>% as.numeric(),
            year = format(`DATE TIME`, '%Y') %>% as.numeric(),
            WY = if_else(month < 10, year, year + 1)) %>% 
     # filter out incomplete annual data
@@ -96,345 +54,93 @@ plan <- drake_plan(
     add_count() %>% 
     ungroup() %>% 
     filter(n >= 365) %>% 
-    mutate(season = case_when(month >= 10 | month <= 3 ~ 'rainy',
-                              month >= 4 & month <= 5 ~ 'breeding_early',
-                              month >= 6 & month <= 8 ~ 'breeding_late',
-                              TRUE ~ NA_character_),
-           season = factor(season, 
-                           levels = c('rainy', 'breeding_early', 
-                                      'breeding_late')
-                           ), #rainy comes first in a WY
-           flow50 = if_else(VALUE > 50000, VALUE - 50000, 0), #daily flow above 50k cfs
-           flow14 = if_else(VALUE > 14000, VALUE - 14000, 0) #daily flow above 14k cfs
-    ),
+    # subtract threshold values
+    mutate(flow50 = if_else(VALUE > 50000, VALUE - 50000, 0), #daily flow above 50k cfs
+           flow14 = if_else(VALUE > 14000, VALUE - 14000, 0)) %>%  #daily flow above 14k cfs
+    # summarize annual flow totals above thresholds per station
+    group_by(STATION_ID, WY) %>% 
+    summarize(ndays = length(VALUE[!is.na(VALUE)]),
+              flowtot = sum(VALUE, na.rm = TRUE),
+              flow50 = sum(flow50, na.rm = TRUE),
+              flow14 = sum(flow14, na.rm = TRUE),
+              .groups = 'drop') %>% 
+    # check those with data for <90% of days each year
+    mutate_at(vars(flowtot:flow14),
+              ~if_else(ndays < 0.9*365, NA_real_, .)),
   
-  # calculate annual and seasonal flow totals per station
-  mflow_tot = bind_rows(
-    # annual totals
-    mflowdat %>% 
-      group_by(STATION_ID, WY) %>% 
-      summarize(season = 'annual',
-                n = length(VALUE[!is.na(VALUE)]),
-                flowtot = sum(VALUE, na.rm = TRUE),
-                flow50 = sum(flow50, na.rm = TRUE),
-                flow14 = sum(flow14, na.rm = TRUE),
-                .groups = 'drop') %>% 
-      # check those with data for <90% of days each year
-      mutate_at(vars(flowtot:flow14),
-                ~if_else(n < 0.9*365, NA_real_, .)),
-    # seasonal totals
-    mflowdat %>% 
-      group_by(STATION_ID, WY, season) %>% 
-      summarize(n = length(VALUE[!is.na(VALUE)]),
-                flowtot = sum(VALUE, na.rm = TRUE),
-                flow50 = sum(flow50, na.rm = TRUE),
-                flow14 = sum(flow14, na.rm = TRUE),
-                .groups = 'drop') %>% 
-      filter(!is.na(season)) %>% 
-      # check those with data for <90% of days in each season
-      mutate_at(vars(flowtot:flow14),
-                ~case_when(season == 'breeding_early' & n < 0.9*61 ~ NA_real_,
-                           season == 'breeding_late' & n < 0.9*61 ~ NA_real_,
-                           season == 'rainy' & n < 0.9*182 ~ NA_real_,
-                           TRUE ~ .)) %>% 
-      select(-n)
-  ),
+  # Note: originally explored seasonal flow data, but annual totals highly
+  # correlated with rainy season totals, and breeding season totals very low
 
-  # ggplot(mflow_tot %>% filter(STATION_ID == 'VIN'),
-  #        aes(WY, flowtot)) + geom_line() + geom_point() +
+  # # check correlations across stations & metrics:
+  # # - each metric highly correlated across 4 stations (>0.95)
+  # # - strong correlations across metrics also (>0.85)
+  # corrplot::corrplot.mixed(
+  #   cor(mflowdat %>% filter(WY >= 1999) %>% select(-ndays) %>% 
+  #         pivot_wider(names_from = STATION_ID,
+  #                     values_from = flowtot:flow14) %>%
+  #         select(-WY) %>% drop_na(),
+  #       method = 'pearson'),
+  #   tl.col = 'black', tl.pos = 'lt')
+  
+  # ggplot(mflowdat, aes(WY, flowtot)) + geom_line() + geom_point() +
   #   geom_line(aes(WY, flow50), color = 'blue') +
   #   geom_line(aes(WY, flow14), color = 'red') +
-  #   facet_wrap(~season, scales = 'free')
-  # # decline in late breeding season flows over time (and high flows) over time
-  # # --> less change in early breeding season flows
-  
-  # # check correlations across stations, seasons, and metrics
-  # # > early breeding season: very strong correlations across stations & metrics
-  # corrplot::corrplot.mixed(
-  #   cor(mflow_tot %>% filter(WY >= 2000 & season == 'breeding_early') %>%
-  #         pivot_wider(names_from = STATION_ID,
-  #                     values_from = flowtot:flow14) %>%
-  #         select(-WY, -season, -n) %>% drop_na(),
-  #       method = 'pearson'),
-  #   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
-  # 
-  # # > late breeding season: zero flow50!  strong correlations across stations;
-  # # little relationship between flow14 & flowtot
-  # corrplot::corrplot.mixed(
-  #   cor(mflow_tot %>% filter(WY >= 2000 & season == 'breeding_late') %>%
-  #         pivot_wider(names_from = STATION_ID,
-  #                     values_from = flowtot:flow14) %>%
-  #         select(-starts_with('flow50')) %>% 
-  #         select(-WY, -season, -n) %>% drop_na(),
-  #       method = 'pearson'),
-  #   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
-  # 
-  # # > rainy season: very strong correlations across stations & all metrics
-  # corrplot::corrplot.mixed(
-  #   cor(mflow_tot %>% filter(WY >= 2000 & season == 'rainy') %>%
-  #         pivot_wider(names_from = STATION_ID,
-  #                     values_from = flowtot:flow14) %>%
-  #         select(-WY, -season, -n) %>% drop_na(),
-  #       method = 'pearson'),
-  #   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
+  #   facet_wrap(~STATION_ID)
 
-  
   # summarize average across stations
-  mflow_sum = mflow_tot %>% 
-    group_by(WY, season) %>% 
-    summarize(n = length(flowtot[!is.na(flowtot)]), #note sometimes only 3 stations available per time step
+  mflow_sum = mflowdat %>% 
+    group_by(WY) %>% 
+    summarize(nstations = length(flowtot[!is.na(flowtot)]), #note sometimes only 3 stations available per time step
               flowtot = mean(flowtot, na.rm = TRUE),
               flow50 = mean(flow50, na.rm = TRUE),
               flow14 = mean(flow14, na.rm = TRUE),
               .groups = 'drop') %>% 
-    filter(WY >= 1997) %>% 
-    select(-n) %>% #ranges 2-4 stations contributing data; mostly 4 from 2002 on
-    pivot_wider(names_from = season, values_from = flowtot:flow14) %>% 
-    # calculate running totals for current rainy season + 1-2 prior WYs
-    mutate(flowtot_cum3 = flowtot_rainy + lag(flowtot_annual, 1) + 
-             lag(flowtot_annual, 2),
-             # zoo::rollsum(lag(flowtot_annual), 2, fill = NA, align = 'right'),
-           flow50_cum3 = flow50_rainy + lag(flow50_annual, 1) + 
-             lag(flow50_annual, 2),
-             # zoo::rollsum(lag(flow50_annual), 2, fill = NA, align = 'right'),
-           flow14_cum3 = flow14_rainy + lag(flow14_annual, 1) + 
-             lag(flow14_annual, 2),
-             # zoo::rollsum(lag(flow14_annual), 2, fill = NA, align = 'right')
-           flowtot_cum2 = flowtot_rainy + lag(flowtot_annual, 1),
-           flow50_cum2 = flow50_rainy + lag(flow50_annual, 1),
-           flow14_cum2 = flow14_rainy + lag(flow14_annual, 1)
-           ),
+    filter(WY >= 1999) %>% 
+    select(-nstations) %>% #ranges 3-4 stations contributing data each water year
+    # calculate running totals for current and 2 prior water years
+    mutate(flowtot_3 = zoo::rollsum(flowtot, 3, fill = NA, align = 'right'),
+           flow50_3 = zoo::rollsum(flow50, 3, fill = NA, align = 'right'),
+           flow14_3 = zoo::rollsum(flow14, 3, fill = NA, align = 'right')),
   
   # # check correlations:
   # corrplot::corrplot.mixed(
-  #   cor(mflow_sum %>% select(-WY) %>%
-  #         select(-(starts_with('flow50') & ends_with('late'))) %>%
-  #         drop_na(), method = 'pearson'),
+  #   cor(mflow_sum %>% drop_na(), method = 'pearson'),
   #   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
-  # # - strong correlations within cumulative metrics, but not with any
-  # # seasonal/annual metrics
-  # # - strong correlations among annual & rainy season metrics
-  # # - strong correlations (>0.7) among breeding season metrics, but not really
-  # # with rainy season or annual metrics
+  # # - strong correlations among annual and cumulative metrics, but not across
+  # # them; no trend/correlation with water year
 
-  
-  # > unimpaired flow data ---------
-  # Total "unimpaired" outflow and the "Sacramento River Index" or "4 River
-  # Index" from: http://cdec.water.ca.gov/reportapp/javareports?name=WSIHIST
-  
-  # --> NOTE: this is "unimpaired flow", but it is strongly correlated with
-  # river gauge data from 4 stations along reaches 2-3 (and these data go back
-  # farther)
-  
-  sri = RCurl::getURL('http://cdec.water.ca.gov/reportapp/javareports?name=WSIHIST') %>% 
-    strsplit("\\r\\n"),
-  
-  sri_sum = sri[[1]][416:538] %>%
-    read_table(skip = 4,
-               col_names = c('WY', 'Sac_Oct-Mar', 'Sac_Apr-Jul', 'Sac_WYsum',
-                             'Sac_Index', 'Type_Sac',
-                             'SJ_Oct-Mar', 'SJ_Apr-Jul', 'SJ_WYsum', 'SJ_Index',
-                             'Type_SJ')) %>%
-    select(WY, starts_with('Sac')) %>%
-    rename(Runoff_OctMar = 'Sac_Oct-Mar',
-           Runoff_AprJul = 'Sac_Apr-Jul',
-           Runoff_WY = 'Sac_WYsum',
-           SRI = 'Sac_Index'),
-  
-  
-  # # check correlations:
-  # corrplot::corrplot.mixed(
-  #   cor(full_join(sri_sum %>% filter(WY >= 2000),
-  #                 mflow_sum %>% select(WY, flow14_rainy, flow14_breeding, flow14_cum)) %>%
-  #         select(-WY) %>% drop_na(),
-  #       method = 'pearson'),
-  #   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
-  # 
-  # # very strong positive correlations between SRI, unimpaired runoff, and gauge
-  # # data; cross-seasonal correlations not strong; cumulative flow data not
-  # # correlated with annual/seasonal runoff or SRI
-
-  # 2. Rip rap/revetment----------
-  # total extent (miles) of rip rap installed on relevant stretches of the
-  # Sacramento River directly related to total nest site availability (carrying
-  # capacity), and thus limits growth, but annual data are lacking
-  
-  
-  
-  # 3. Foraging habitat (breeding season)---------
+  # 2. Breeding season conditions---------
   # loss of foraging habitat for BANS (and more broadly, aerial insectivores) is
-  # likely an important factor in pop declines; for BANS natural cover near
-  # waterways/colonies is important; drought may also play an important role,
-  # particularly for during winter just before migration with effects on
-  # survival
-  
-  # > proposed metrics: indices of drought/primary productivity near the river
-  
-  # > Vegetation indices-----
-  # from MODIS (see GIS pre-processing script)
+  # likely an important factor in pop declines; drought/primary productivity may
+  # play an important role in nestling survival
 
-  # NDVI/EVI within 1km of burrows, 2000-2020
-  # --> mean value in Apr-Aug (breeding season) 
-  cadat = read_csv('GIS/CA_1k/MOD13Q1-006-Statistics.csv', col_types = cols()) %>% 
-    mutate(metric = gsub('.*_', '', Dataset),
-           year = as.numeric(format(Date, '%Y')),
-           month = as.numeric(format(Date, '%m')),
-           WY = if_else(month >= 10, year + 1, year),
-           # same seasons as for flow data above
-           season = case_when(month >= 10 | month <= 3 ~ 'rainy',
-                              month >= 4 & month <= 5 ~ 'breeding_early',
-                              month >= 6 & month <= 8 ~ 'breeding_late',
-                              TRUE ~ NA_character_),
-           season = factor(season, 
-                           levels = c('rainy', 'breeding_early', 
-                                      'breeding_late'))) %>% 
-    select(metric, Date, WY, month, season, 
-           Mean, SD = `Standard Deviation`),
-  
-  # # increasing trend in EVI over time, with higher peak values in later years
-  # ggplot(cadat %>% mutate(Date = as.numeric(format(Date, '%j'))) %>%
-  #          filter(metric == 'EVI'),
-  #        aes(Date, Mean, group = year, color = year)) +
-  #   annotate("rect", xmin = 91, xmax = 243, ymin = 0.2, ymax = 0.5,
-  #            fill = 'gray80', alpha = 0.5) +
-  #   annotate("rect", xmin = 121, xmax = 181, ymin = 0.2, ymax = 0.5,
-  #            fill = 'gray50', alpha = 0.5) +
-  #   geom_point() + geom_line() + scale_color_viridis_c()
-  # # May-June only:
-  # ggplot(cadat %>% mutate(Date = as.numeric(format(Date, '%j'))) %>%
-  #          filter(metric == 'EVI' & month >= 5 & month <= 6),
-  #        aes(Date, Mean, group = year, color = year)) +
-  #   geom_point() + geom_line() + scale_color_viridis_c()
-
-  
-  # summarize values by season/year
-  cadat_sum = bind_rows(
-    # by season
-    cadat %>% 
-      group_by(metric, WY, season) %>% 
-      summarize(Mean = mean(Mean),
-                SD = sqrt(sum(SD^2)), # error propagation
-                .groups = 'drop') %>% 
-      filter(!is.na(season)),
-    # add combined breeding season
-    cadat %>% 
-      mutate(season = gsub('_early|_late', '', season)) %>% 
-      filter(season == 'breeding') %>% 
-      group_by(metric, WY, season) %>% 
-      summarize(Mean = mean(Mean),
-                SD = sqrt(sum(SD^2)), # error propagation
-                .groups = 'drop')
-    ),
-
-  
-  # # mean values increase over time, but not super strong relative to
-  # # variance; breeding season variables very similar
-  # ggplot(cadat_sum, aes(WY, Mean, color = season)) +
-  #   geom_line() + geom_point() + geom_smooth() +
-  #   geom_errorbar(aes(ymin = Mean-SD, ymax = Mean+SD), width = 0.1) +
-  #   facet_wrap(~metric, nrow = 2)
-  # 
-  # # check correlations: strong correlation across seasonal EVI & NDVI
-  # corrplot::corrplot.mixed(
-  #   cor(cadat_sum %>% filter(season != 'rainy') %>% 
-  #         select(metric, season, year, Mean) %>% 
-  #         pivot_wider(names_from = c('metric', 'season'), values_from = Mean) %>%
-  #         select(-year),
-  #       method = 'pearson'),
-  #   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
-  # 
-  # # breeding early and late fairly correlated (0.59)
-  # corrplot::corrplot.mixed(
-  #   cor(cadat_sum %>% filter(metric == 'EVI') %>% 
-  #         select(year, season, Mean) %>% 
-  #         pivot_wider(names_from = season, values_from = Mean) %>%
-  #         select(-year),
-  #       method = 'pearson'),
-  #   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
-
-  # > Drought indices---------
-  drought = purrr::map_df(c('pdsidv', 'zndxdv'),
+  # drought indices from NOAA for Sacramento Valley area:
+  droughtdat = purrr::map_df(c('pdsidv', 'zndxdv'),
                           ~get_drought_indices(datname = .x, statecode = '04', 
                                                climdivcode = '02')) %>% 
     mutate(month = format(date, '%m') %>% as.numeric(),
            year = as.numeric(year),
            WY = if_else(month >= 10, year + 1, year),
            season = case_when(month >= 10 | month <= 3 ~ 'rainy',
-                              month >= 4 & month <= 5 ~ 'breeding_early',
-                              month >= 6 & month <= 8 ~ 'breeding_late',
+                              month >= 4 & month <= 8 ~ 'breeding',
                               TRUE ~ NA_character_)) %>% 
-    filter(WY >= 1985),
+    filter(WY >= 1999),
   
-  # generate annual and seasonal summaries:
-  drought_sum = bind_rows(
-    drought %>%
-      group_by(index, WY, season) %>%
-      summarize(value = mean(value),
-                .groups = 'drop') %>% 
-      filter(!is.na(season)),
-    drought %>% 
-      mutate(season = gsub('_early|_late', '', season)) %>% 
-      filter(season == 'breeding') %>% 
-      group_by(index, WY, season) %>%
-      summarize(value = mean(value),
-                .groups = 'drop')) %>% 
+  # generate breeding season summaries:
+  drought_sum = droughtdat %>% 
+    filter(season == 'breeding') %>% 
+    group_by(index, WY) %>%
+    summarize(value = mean(value),
+              .groups = 'drop') %>% 
+    pivot_wider(names_from = 'index') %>% 
     drop_na(),
-  
-  # # no clear trend; PDSI more variable?
-  # ggplot(drought_sum %>% filter(WY > 1999 & season == 'breeding'), 
-  #        aes(WY, value, color = season)) +
-  #   geom_line() + geom_point() + geom_smooth() +
-  #   facet_wrap(~index, nrow = 2)
-  # 
-  # # strong correlation
-  # drought_sum %>% filter(WY>1999 & season == 'breeding') %>% 
-  #   pivot_wider(names_from = index) %>% 
-  #   ggplot(aes(pdsidv, zndxdv)) + geom_point() + geom_smooth()
-  # 
+
   # # correlations:
   # corrplot::corrplot.mixed(
-  #   cor(drought_sum %>% filter(WY >= 1999) %>%
-  #         pivot_wider(names_from = c('index', 'season'),
-  #                     values_from = value),
-  #       method = 'pearson'),
+  #   cor(drought_sum %>% filter(WY >= 1999), method = 'pearson'),
   #   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
-  # # none with WY
-  # # strong across indices within season, and across breeding (early/late)
-  # # e.g. pdsi_breeding & zndx_breeding (0.89)
-  
-  
-  # 4. Winter conditions------
-  
-  # > Vegetation indices from MODIS (see GIS pre-processing script)
-  # NDVI/EVI within possible winter range in MX, 2000-2018
-  # --> this is highly speculative!
-  
-  # take the mean value in Feb-Apr (ending just before migration and the arrival
-  # in CA of the bulk of breeding birds in late Apr/early May )
-  mxdat = read_csv('GIS/MX/MOD13A3-006-Statistics.csv', col_types = cols()) %>% 
-    mutate(metric = gsub('.*_', '', Dataset),
-           year = as.numeric(format(Date, '%Y')),
-           month = as.numeric(format(Date, '%m')),
-           WY = if_else(month >= 10, year + 1, year)) %>% 
-    select(metric, WY, month, Mean, SD = `Standard Deviation`) %>% 
-    filter(month >= 2 & month <= 4) %>% 
-    group_by(metric, WY) %>% 
-    summarize(Mean = mean(Mean),
-              SD = sqrt(sum(SD^2)),
-              .groups = 'drop'),
-  
-  # # slight increasing trend over time; 2010 stands out as particularly high
-  # ggplot(mxdat, aes(year, Mean)) + geom_point() + geom_line() + 
-  #   geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.1) +
-  #   geom_smooth() +
-  #   facet_wrap(~metric, nrow = 2)
+  # # strong correlation across indices (0.92); no trend/water year correlation
 
-  # # check correlations: very strong positive correlation (0.99) between NDVI & EVI
-  # corrplot::corrplot.mixed(
-  #   cor(mxdat %>% select(-year), method = 'pearson'),
-  #   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
-
-  
   # Compiled predictors----------------
   # check for correlations among predictors
 
@@ -877,7 +583,7 @@ plan <- drake_plan(
                      obsdat = modeldat,
                      scale = 10000, center = 0) + ylim(0, NA)
   
-  # > 2. N----------
+  # 2. N----------
   # these models are slower to run, and are parameterized differently to
   # directly take burrow counts in as the "y" observations, estimated with error
   # as a count of the true population N, and essentially calculate the growth
