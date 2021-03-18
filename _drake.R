@@ -5,6 +5,7 @@
 
 source("R/packages.R")  # Load your packages, e.g. library(drake).
 source("R/functions.R") # Define your custom code as a bunch of functions.
+source("R/fit_model.R")
 source("R/plan.R")      # Create your drake plan.
 
 # _drake.R must end with a call to drake_config().
