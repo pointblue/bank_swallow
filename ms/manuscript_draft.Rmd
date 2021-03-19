@@ -148,7 +148,7 @@ Table 1. Summary of predictor variables, with ranges/means/stats
 \clearpage
 
 \newpage
-<!-- ![](../ms_figs/fig_1.png){ width=100% } -->
+<!-- ![](./ms_figs/covariate_effects.png){ width=100% } -->
 **Figure 1: Map of study area.**
 * With burrow locations?
 * With breeding/wintering range?
@@ -156,8 +156,13 @@ Table 1. Summary of predictor variables, with ranges/means/stats
 \clearpage
 
 \newpage
-<!-- ![](../ms_figs/fig_2.png){ width=100% } -->
-<!-- **Figure 2:**  -->
+![](../ms_figs/observed_v_predicted.png){ width=100% }
+**Figure 2: Observed vs. model-predicted values for per-capita growth rate and annual number of burrows counted.** Includes predicted values for missing growth rates for 2005-06 and number of burrows counted in 2006, as well as predictions for 2021.
+\clearpage
+
+\newpage
+![](../ms_figs/effect_size.png){ width=100% }
+**Figure 2: Partial effects plots for each covariate.**
 \clearpage
 
 # Supplementary Materials
