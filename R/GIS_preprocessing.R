@@ -2,6 +2,14 @@
 library(tidyverse)
 library(sf)
 
+# Extract BANS data from excel-----------
+readxl::read_excel(
+  file_in('data/BANS/SR R2 and R3 BANS ACTIVE BURROWS and OUTFLOWS 1986-2020.xlsx'),
+  sheet = 2, range="A5:E38", 
+  col_types = c('numeric', 'skip', 'skip', 'skip', 'numeric'),
+  col_names = c('year', 'burrows')) %>% 
+  write_csv('data/BANS_burrow_counts.csv')
+
 # Primary study area (breeding season)-----------
 # burrow locations:
 shp = read_sf('GIS/ds6.shp') %>% filter(RIVMI >= 144 & RIVMI <= 243)
