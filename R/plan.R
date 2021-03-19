@@ -161,53 +161,6 @@ plan <- drake_plan(
     filter(year >= 1999),
   # missing only _tp1 data for 2020
   
-  # # plot relationships with pgr:
-  # modeldat %>%
-  #   mutate_at(vars(starts_with('flow')), ~log(. + 1)) %>%
-  #   pivot_longer(-starts_with(c('year', 'pgr'))) %>%
-  #   ggplot(aes(value, pgr, color = year)) + geom_point() +
-  #   scale_color_viridis_c() +
-  #   geom_smooth(method = 'lm') +
-  #   facet_wrap(~name, scales = 'free') +
-  #   xlab(NULL)
-  # 
-  # positive relationships with pgr:
-  # - burrows_tp1 (of course)
-  # - flow14
-  # - flow14_3 (slight)
-  # - flow14_3_tp1 (slight)
-  # - pdsi
-  #
-  # negative relationship with pgr:
-  # - burrows (density dependence)
-  # - flow14_tp1 - but appears driven by 3 data points with unusually high
-  #    growth
-  # - pdsi_tp1 (slight)
-  #
-
-  
-  # # plot relationships with #burrows: (carrying capacity?)
-  # modeldat %>%
-  #   mutate_at(vars(starts_with('flow')), ~log(. + 1)) %>%
-  #   pivot_longer(-starts_with(c('year', 'burrows'))) %>%
-  #   ggplot(aes(value, burrows, color = year)) + geom_point() +
-  #   scale_color_viridis_c() +
-  #   geom_smooth(method = 'lm') +
-  #   facet_wrap(~name, scales = 'free') +
-  #   xlab(NULL)
-  # 
-  # positive relationship with #burrows: 
-  # - flow14_3
-  # - flow14_3_tp1 (very slight)
-  # - flow14_tp1 (very slight)
-  #
-  # negative relationship:
-  # - pgr
-  # - flow14 (slight)
-  # - pdsi (slight)
-  # - pdsi_tp1 (very slight)
-
-  
   # # check correlations with birddat & across metrics (log-transform flow metrics)
   # corrplot::corrplot.mixed(
   #   cor(modeldat %>% mutate_at(vars(starts_with('flow')), ~log(.+1)) %>%
@@ -220,425 +173,99 @@ plan <- drake_plan(
   #
   # strongest negative correlation:
   # - burrows & year (-0.63)
+  
+  # Summary stats & figure------------
+  cov_stats = modeldat %>% select(year, flow14, flow14_3, pdsi) %>%
+    mutate(t = year) %>% pivot_longer(-year) %>%
+    group_by(name) %>%
+    summarize(mean = mean(value, na.rm = TRUE),
+              median = median(value, na.rm = TRUE),
+              sd = sd(value, na.rm = TRUE),
+              max = max(value, na.rm = TRUE),
+              min = min(value, na.rm = TRUE),
+              .groups = 'drop'),
+  
+  fig_covariates = ggsave(filename = 'fig/covariates.png',
+                          plot = plot_covariates(modeldat),
+                          width = 6, height = 6, units = 'in'),
 
   # ANALYSIS-----------
-  # 1. growth rate----------
-  # may be easier than modeling N because it can possibly avoid autocorrelation
-  # issues 
 
-  # set up model input data
+  # input data: drop 2006 because can't having missing values in
+  # N_obs since it is a predictor
   inputdat = list(
     # per-capita growth rate t to t+1
-    y = modeldat %>% pull(pgr),
+    y = modeldat %>% filter(year != 2006) %>% pull(pgr),
     # density-independent predictors of growth rate from t to t+1:
     Bpredictors = modeldat %>% 
       select(year, flow14, flow14_3, pdsi) %>%
       mutate(t = year) %>% 
       # log transform flow data
       mutate_at(vars(starts_with('flow')), ~log(.+1)) %>%
-      # calculate anomaly:
-      pivot_longer(-year) %>%
-      group_by(name) %>%
-      mutate(max = max(value, na.rm = TRUE),
-             min = min(value, na.rm = TRUE),
-             mean = mean(value, na.rm = TRUE),
-             zvalue = (value - mean) / (max - min)) %>%
-      select(year, name, zvalue) %>%
-      pivot_wider(names_from = name, values_from = zvalue) %>%
-      select(-year),
-    N_obs = modeldat %>% pull(burrows) %>% round(digits = 0)
+      # scale
+      mutate_at(vars(flow14:t), ~scale(., center = TRUE, scale = TRUE)) %>% 
+      filter(year != 2006) %>% select(-year),
+    N = modeldat %>% filter(year != 2006) %>% 
+      pull(burrows) %>% scale(center = TRUE, scale = TRUE) %>% as.vector(),
+    # keep full list of unscaled N_obs for prediction purposes
+    N_obs = modeldat %>% pull(burrows) %>% round(digits = 0),
+    # range of values for each predictor
+    predmatrix = tibble(flow14 = seq(-2.2, 1.5, length.out = 11),
+                        flow14_3 = seq(-2, 1.4, length.out = 11),
+                        pdsi = seq(-1.4, 2, length.out = 11),
+                        t = (seq(1999, 2020, 2) - 2009.5)/6.493587,
+                        N = (seq(-1.6, 1.4, length.out = 11)))
     ),
 
-  scale_params = modeldat %>% 
-    select(year, flow14, flow14_3, pdsi) %>%
-    mutate(t = year) %>% 
-    # log transform flow data
-    mutate_at(vars(starts_with('flow')), ~log(.+1)) %>%
-    # calculate anomaly:
-    pivot_longer(-year) %>%
-    group_by(name) %>%
-    summarize(max = max(value, na.rm = TRUE),
-              min = min(value, na.rm = TRUE),
-              center = mean(value, na.rm = TRUE),
-              scale = max - min,
-              .groups = 'drop') %>% 
-    select(-max, -min),
-  
-  # > simple logistic model-----
-  # including a constant effect of density dependence
-  # --> for this one, because N is now a predictor, can't have missing values
-  
-  inputdat2 = list(y = inputdat$y[c(1:7,9:22)],
-                   Bpredictors = inputdat$Bpredictors[c(1:7, 9:22), ],
-                   # pop size estimate from t (center on 10000, in thousands)
-                   N = (inputdat$N_obs[c(1:7,9:22)]-15000)/10000,
-                   # keep all N_obs for predicting
-                   N_obs = inputdat$N_obs,
-                   predmatrix = tibble(flow14 = seq(-0.6, 0.4, length.out = 22),
-                                       flow14_3 = seq(-0.6, 0.4,
-                                                      length.out = 22),
-                                       pdsi = seq(-0.4, 0.6, length.out = 22),
-                                       t = inputdat$Bpredictors$t)
-                   ),
-
-  # alt parameterization to directly estimate strength of density dependence
-  # without having to estimate K; effect of density dependence still assumed to
-  # be constant
-  mod_growth_logistic = fit_BANSpopgrowth_model(
-    inputdat2, n.adapt = 5000, n.burnin = 15000, n.sample = 150000, n.chains = 3,
-    holdout = 0, type = 'growth_logistic_simple',
-    vars = c('r0', 'beta', 'k', 'var.o', 'var.p', 'ysim', 'ysim.2006', 'Nsim',
-             'pvalue.mean', 'pvalue.sd', 'pvalue.fit'),
-    thin = 50),
-  MCMCvis::MCMCsummary(mod_growth_logistic,
-                       c('r0', 'beta', 'k', 'var.o', 'var.p',
-                         'pvalue.mean', 'pvalue.sd', 'pvalue.fit'))
-  # MCMCvis::MCMCtrace(mod_growth_logistic2,
-  #                    params = c('r0', 'beta', 'k', 'var.o', 'var.p'),
-  #                    pdf = FALSE)
-  # # fits well; n.eff sufficient; trace plots well-mixed
-  # plot_model_predictions(mod_growth_logistic,
-  #                       year = c(1999:2005, 2007:2020, 2006, 1999:2021),
-  #                       obsdat = modeldat)
-  # # predictions reasonable
-  # get_sumstats(mod_growth_logistic2, c('beta', 'k'),
-  #              id = c(inputdat2$Bpredictors %>% names(), 'k'))
-  # # strong effects of flow14_cum3 (+) and dd (-); pdsi  and flow14_annual close-ish?
-  
-  # > logistic with variable density dependence------
-  # allows strength of density dependence to vary annually from a normal
-  # distribution with mean k0 and error var.k
-  mod_growth_vark = fit_BANSpopgrowth_model(
-    inputdat2, n.adapt = 5000, n.burnin = 15000, n.sample = 50000, n.chains = 3,
-    holdout = 0, type = 'growth_logistic_vark',
+  # fit logistic model: allows strength of density dependence to vary annually
+  # from a normal distribution with mean k0 and error var.k
+  mod = fit_BANSpopgrowth_model(
+    inputdat, n.adapt = 5000, n.burnin = 15000, n.sample = 50000, n.chains = 3,
     vars = c('r0', 'beta', 'k0', 'k', 'var.o', 'var.p', 'var.k',
              'ysim', 'ysim.2006', 'Nsim', 'ypred',
              'pvalue.mean', 'pvalue.sd', 'pvalue.fit'),
     thin = 25),
-  MCMCvis::MCMCsummary(mod_growth_vark,
-                       c('r0', 'beta', 'k0', 'var.o', 'var.p', 'var.k',
-                         'pvalue.mean', 'pvalue.sd', 'pvalue.fit'))
-  MCMCvis::MCMCtrace(mod_growth_vark,
-                     params = c('r0', 'beta', 'k0', 'var.o', 'var.p', 'var.k'),
-                     pdf = FALSE)
+  
+  # MCMCvis::MCMCsummary(mod,
+  #                      c('r0', 'beta', 'k0', 'var.o', 'var.p', 'var.k',
+  #                        'pvalue.mean', 'pvalue.sd', 'pvalue.fit'))
+  # MCMCvis::MCMCtrace(mod,
+  #                    params = c('r0', 'beta', 'k0', 'var.o', 'var.p', 'var.k'),
+  #                    pdf = FALSE)
   # fits well; n.eff sufficient; trace plots well-mixed;
-  # var.k estimate fairly large compared to var.o and var.p
-  plot_model_predictions(mod_growth_vark,
-                         year = c(1999:2005, 2007:2020, 2006, 1999:2021),
-                         obsdat = modeldat)
-  ggsave(filename = 'ms_figs/observed_v_predicted.png')
-  # predictions reasonable
-  get_sumstats(mod_growth_vark, c('beta', 'k0', 'var.k'),
-               id = c(inputdat2$Bpredictors %>% names(), 'k0', 'var.k')) %>% 
-    filter(id %in% c('flow14', 'flow14_3', 'pdsi', 't', 'k0')) %>% 
-    mutate(id = recode(id, 'pdsi' = 'Annual mean Palmer\nDrought Severity Index,\nApr-Aug',
-                        'flow14' = 'Annual stream flow\n> 14,000 cfs',
-                        'flow14_3' = '3-year cumulative\nstream flow\n> 14,000 cfs',
-                        't' = 'Long-term trend',
-                        'k0' = 'Strength of\ndensity dependence')) %>% 
-    ggplot(aes(id, median, ymin = lci, ymax = uci)) + 
-    geom_point() + geom_errorbar(width = 0.25) +
-    labs(x = NULL, y = 'effect size') + coord_flip()
-  ggsave(filename = 'ms_figs/effect_size.png')
-  # strong effects of flow14_cum3 (+) and dd (-)
+  
+  # Summary stats & figures---------
+  effect_stats = get_sumstats(mod, c('beta', 'k0', 'var.k'),
+                              id = c(inputdat$Bpredictors %>% names(), 
+                                     'k0', 'var.k')),
+  # strong positive effect of flow14_3, negative effect of k0
+  
+  # simulated vs. observed pgr & burrows:
+  fig_simulations = ggsave(filename = 'fig/simulations.png',
+                           plot = plot_simulations(mod, obsdat = modeldat),
+                           width = 6, height = 6, units = 'in'),
 
-  plot_cov_relationships(mod_growth_vark,
-                         nm = names(inputdat2$predmatrix),
-                         xvals = inputdat2$predmatrix %>%
-                           mutate(index = c(1:nrow(.))) %>%
-                           pivot_longer(-index) %>%
-                           left_join(scale_params) %>%
-                           mutate(value = value * scale + center,
-                                  value = case_when(name %in% c('flow14', 'flow14_3') ~ exp(value)/1000000,
-                                                    TRUE ~ value)
-                                  ) %>%
-                           select(index, name, value) %>%
-                           arrange(name, index),
-                         obsdat = modeldat %>%
-                           select(pgr, flow14, pdsi, flow14_3, t = year) %>%
-                           pivot_longer(-pgr, names_to = 'cov') %>% 
-                           mutate(value = case_when(cov %in% c('flow14', 'flow14_3') ~ value/1000000,
-                                                    TRUE ~ value))
-                           )
-  ggsave(filename = 'ms_figs/covariate_effects.png')
+  # strength of effects
+  fig_effectsizes = ggsave(filename = 'fig/effect_size.png',
+                           plot = plot_sumstats(mod, c('beta', 'k0', 'var.k'),
+                                                id = c(inputdat$Bpredictors %>% 
+                                                         names(), 'k0', 'var.k')),
+                           width = 6, height = 3, units = 'in'),
+  
+
+
+  fig_covpred = ggsave(filename = 'fig/covariate_effects.png',
+                       plot = plot_cov_relationships(mod, inputdat = inputdat,
+                                                     obsdat = modeldat),
+                       width = 6, height = 5, units = 'in')
   
   # # examine variability in k estimates over the years:
-  # MCMCvis::MCMCplot(mod_growth_vark, params = 'k')
+  # MCMCvis::MCMCplot(mod, params = 'k')
   # inputdat2$Bpredictors %>%
   #   mutate(k = MCMCvis::MCMCpstr(mod_growth_vark, 'k', func = median)$k) %>%
   #   pivot_longer(-k) %>%
   #   ggplot(aes(value, k)) + geom_point() + geom_smooth(method = 'gam') +
   #   facet_wrap(~name, scales = 'free')
   # # possibly stronger density dependence with highest flow14 values
-    
-  # > logistic with predicted K-------
-  # let cumulative flow be a predictor of K; move from Bpredictors to Kpredictors
-  inputdat3 = list(y = inputdat$y[c(1:7,9:22)],
-                   Bpredictors = inputdat$Bpredictors[c(1:7,9:22), c('flow14', 'pdsi', 't')],
-                   Kpredictors = inputdat$Bpredictors[c(1:7,9:22), 'flow14_3'],
-                   # pop size estimate from t (center on 15000, scale in tens of
-                   # thousands)
-                   N = (inputdat$N_obs[c(1:7,9:22)]-15000)/10000,
-                   # keep all N_obs for predicting
-                   N_obs = inputdat$N_obs,
-                   predmatrix = tibble(flow14 = seq(-0.6, 0.4, length.out = 22),
-                                       pdsi = seq(-0.4, 0.6, length.out = 22),
-                                       t = inputdat$Bpredictors$t,
-                                       flow14_3 = seq(-0.6, 0.4, 
-                                                      length.out = 22))),
 
-  mod_growth_predK = fit_BANSpopgrowth_model(
-    inputdat3, n.adapt = 10000, n.burnin = 40000, n.sample = 50000, 
-    n.chains = 3, holdout = 0, type = 'growth_logistic_predK',
-    vars = c('r0', 'beta', 'kappa', 'k0', 'k', 
-             'var.o', 'var.p', 'var.k', 'ysim', 'ysim.2006', 'Nsim', 'ypred', 
-             'pvalue.mean', 'pvalue.sd', 'pvalue.fit'),
-    thin = 25),
-  
-  # MCMCvis::MCMCsummary(mod_growth_predK,
-  #                      c('r0', 'beta', 'kappa', 'k0', 
-  #                        'var.o', 'var.p', 'var.k', 
-  #                        'pvalue.mean', 'pvalue.sd', 'pvalue.fit'))
-  # MCMCvis::MCMCtrace(mod_growth_predK,
-  #                    params = c('r0', 'beta', 'kappa', 'k0',
-  #                               'var.o', 'var.p', 'var.k'),
-  #                    pdf = FALSE)
-  # # model fits well; n.eff sufficient; trace plots well mixed
-  # plot_model_predictions(mod_growth_predK,
-  #                        year = c(1999:2005, 2007:2020, 2006, 1999:2021),
-  #                        obsdat = modeldat) +
-  #   theme_classic()
-  # # predictions reasonable, although HPDI interval for #burrows in 2021 goes
-  # # below zero
-  # get_sumstats(mod_growth_predK, c('beta', 'kappa', 'k0'),
-  #              id = c(inputdat3$Bpredictors %>% names(), 
-  #                     inputdat3$Kpredictors %>% names(), 'k0'))
-  # 
-  # # strong effects of flow14 (+); no effect of pdsi or t, or of flow14_3 on dd;
-  # # k0 definitely negative
-  # 
-  # plot_cov_relationships(mod_growth_varK,
-  #                        r0 = 0,
-  #                        nm = names(inputdat3$predmatrix),
-  #                        xvals = inputdat3$predmatrix %>% 
-  #                          mutate(index = c(1:nrow(.))) %>% 
-  #                          pivot_longer(-index) %>% 
-  #                          left_join(scale_params) %>% 
-  #                          mutate(value = value * scale + center,
-  #                                 value = case_when(name %in% c('flow14', 'flow14_3') ~ exp(value),
-  #                                                   TRUE ~ value)
-  #                                 ) %>% 
-  #                          select(index, name, value) %>% 
-  #                          arrange(name, index),
-  #                        obsdat = modeldat %>%
-  #                          select(pgr, flow14, pdsi, flow14_3, t = year) %>% 
-  #                          pivot_longer(-pgr, names_to = 'cov'))
-  # 
-  # plot_K_predictions(mod_growth_varK,
-  #                    predictor = seq(400000, 10000000, 500000),
-  #                    obsdat = modeldat,
-  #                    scale = 10000, center = 0) + ylim(0, NA)
-  
-  
-  
-  
-  
-  # >>hold out version----------
-  mod_growth_varK_holdout = fit_BANSpopgrowth_model(
-    inputdat3, n.adapt = 10000, n.burnin = 40000, n.sample = 600000, 
-    n.chains = 3, holdout = 3, type = 'growth_logistic_varK',
-    vars = c('rate', 'beta', 'kappa', 'dd_intercept', 'dd', 
-             'var.o', 'var.p', 'var.d', 'ysim', 'Nsim', 
-             'pvalue.mean', 'pvalue.sd', 'pvalue.fit'),
-    thin = 200),
-  MCMCvis::MCMCsummary(mod_growth_varK_holdout,
-                       c('rate', 'beta', 'kappa', 'dd_intercept', 'var.o', 'var.p',
-                         'var.d', 'pvalue.mean', 'pvalue.sd', 'pvalue.fit'))
-  MCMCvis::MCMCtrace(mod_growth_varK_holdout,
-                     params = c('rate', 'beta', 'kappa', 'dd_intercept',
-                                'var.o', 'var.p', 'var.d'),
-                     pdf = FALSE)
-  # model fits well; n.eff sufficient; trace plots well mixed
-  plot_model_predictions(mod_growth_varK_holdout,
-                         year = c(1999:2005, 2007:2020, 1999:2006, 2008:2021),
-                         obsdat = modeldat, scale = 10000, center = 0)
-  # predictions reasonable
-  get_sumstats(mod_growth_varK_holdout, c('beta', 'kappa', 'dd_intercept'),
-               id = c(inputdat3$Bpredictors %>% names(), 
-                      inputdat3$Kpredictors %>% names(), 'dd'))
-  # strong effects of flow14_cum3 on strength of density dependence (+); dd
-  # negative; other effects as expected - trending positive for flow14_annual &
-  # pdsi, no trend in year
-  plot_K_predictions(mod_growth_varK_holdout,
-                     predictor = seq(400000, 10000000, 500000),
-                     obsdat = modeldat,
-                     scale = 10000, center = 0) + ylim(0, NA)
-  
-  # 2. N----------
-  # these models are slower to run, and are parameterized differently to
-  # directly take burrow counts in as the "y" observations, estimated with error
-  # as a count of the true population N, and essentially calculate the growth
-  # rate internally.
-  
-  # re-do input data: burrow counts need to be integers, so no scaling, but can
-  # have missing values; include counts through 2020 to account for growth rate
-  # estimated for 2019-20 interval
-  inputdatN = list(N_obs = modeldat %>% pull(burrows) %>% round(digits = 0),
-                   Bpredictors = inputdat$Bpredictors),
-
-  # > simple poisson-------
-  # mod_N_poisson = fit_BANSpopgrowth_model(
-  #   inputdatN, n.adapt = 5000, n.burnin = 15000, n.sample = 300000, n.chains = 3,
-  #   holdout = 0, type = 'N_simple_poisson',
-  #   vars = c('rate', 'beta', 'error', 'Nsim', 'ysim',
-  #            'pvalue.mean', 'pvalue.sd', 'pvalue.fit'),
-  #   thin = 100),
-  # MCMCvis::MCMCsummary(mod_N_poisson,
-  #                      c('rate', 'beta',
-  #                        'pvalue.mean', 'pvalue.sd', 'pvalue.fit'))
-  # MCMCvis::MCMCtrace(mod_N_poisson,
-  #                    params = c('rate', 'beta'),
-  #                    pdf = FALSE)
-  # # fit ok; n.eff very low; trace plots terrible; predictions suspiciously precise
-  # plot_model_predictions(mod_N_poisson,
-  #                        year = c(2000:2019, 2000:2020),
-  #                        obsdat = modeldat, scale = 1, center = 0)
-  # # predictions reasonable
-  # get_sumstats(mod_N_poisson, c('beta'),
-  #              id = c(inputdatN$Bpredictors %>% names(), 'year'))
-  # # strong effects of flow14_annual (+) and year (+)
-  
-  # > logistic poisson---------
-  mod_N_logistic_poisson = fit_BANSpopgrowth_model(
-    inputdatN, n.adapt = 5000, n.burnin = 15000, n.sample = 300000, n.chains = 3,
-    holdout = 0, type = 'N_logistic_poisson',
-    vars = c('r0', 'beta', 'k', 'var.p', 'Nsim', 'ysim',
-             'pvalue.mean', 'pvalue.sd', 'pvalue.fit'),
-    thin = 100)
-  MCMCvis::MCMCsummary(mod_N_logistic_poisson,
-                       c('r0', 'beta', 'k', 'var.p',
-                         'pvalue.mean', 'pvalue.sd', 'pvalue.fit'))
-  MCMCvis::MCMCtrace(mod_N_logistic_poisson,
-                     params = c('r0', 'beta', 'k', 'var.p'),
-                     pdf = FALSE)
-  # fit ok; n.eff very low; dd tiny; trace plots terrible
-  plot_model_predictions(mod_N_logistic_poisson,
-                         year = c(2000:2019, 2000:2020),
-                         obsdat = modeldat, scale = 1, center = 0)
-  # predictions suspiciously precise
-  get_sumstats(mod_N_logistic_poisson, c('beta', 'dd'),
-               id = c(inputdatN$Bpredictors %>% names(), 'year', 'dd'))
-  # strong effects of flow14_annual (+) only
-  
-  # > simple lognormal---------
-  mod_N_lnorm = fit_BANSpopgrowth_model(
-    inputdatN, n.adapt = 5000, n.burnin = 15000, n.sample = 50000, n.chains = 3,
-    holdout = 0, type = 'N_simple_lnorm',
-    vars = c('r0', 'beta', 'var.p', 'Nsim', 'ysim',
-             'pvalue.mean', 'pvalue.sd'),
-    thin = 25)
-  MCMCvis::MCMCsummary(mod_N_logistic_poisson,
-                       c('r0', 'beta', 'k', 'var.p',
-                         'pvalue.mean', 'pvalue.sd', 'pvalue.fit'))
-  MCMCvis::MCMCtrace(mod_N_logistic_poisson,
-                     params = c('r0', 'beta', 'k', 'var.p'),
-                     pdf = FALSE)
-  # fit ok; n.eff very low; dd tiny; trace plots terrible
-  plot_model_predictions(mod_N_logistic_poisson,
-                         year = c(2000:2019, 2000:2020),
-                         obsdat = modeldat, scale = 1, center = 0)
-  # predictions suspiciously precise
-  get_sumstats(mod_N_logistic_poisson, c('beta', 'dd'),
-               id = c(inputdatN$Bpredictors %>% names(), 'year', 'dd'))
-  # strong effects of flow14_annual (+) only
-
-  # > simple negative binomial----------
-  # allows more error in the count process than poisson
-
-  # mod_N_negbin = fit_BANSpopgrowth_model(
-  #   inputdatN, n.adapt = 5000, n.burnin = 15000, n.sample = 300000, n.chains = 3,
-  #   holdout = 0, type = 'N_simple_negbin',
-  #   vars = c('rate', 'beta', 'sigma', 'Nsim', 'ysim',
-  #            'pvalue.mean', 'pvalue.sd', 'pvalue.fit'),
-  #   thin = 100),
-  # MCMCvis::MCMCsummary(mod_N_negbin,
-  #                      c('rate', 'beta', 'sigma',
-  #                        'pvalue.mean', 'pvalue.sd', 'pvalue.fit'))
-  # MCMCvis::MCMCtrace(mod_N_negbin,
-  #                    params = c('rate', 'beta', 'sigma'),
-  #                    pdf = FALSE)
-  # # fit ok; n.eff a bit low for rate, with ok traceplots
-  # plot_model_predictions(mod_N_negbin,
-  #                        year = c(2000:2019, 2000:2020),
-  #                        obsdat = modeldat, scale = 1, center = 0)
-  # # predictions reasonable
-  # get_sumstats(mod_N_negbin, c('beta'),
-  #              id = c(inputdatN$Bpredictors %>% names(), 'year'))
-  # # strong effects of flow14_annual (+) and year (+)
-
-  # > logistic negative binomial----------
-  # allows more error in the count process than poisson; add density dependence
-
-  mod_N_logistic_negbin = fit_BANSpopgrowth_model(
-    inputdatN, n.adapt = 5000, n.burnin = 15000, n.sample = 300000, n.chains = 3,
-    holdout = 0, type = 'N_logistic_negbin',
-    vars = c('rate', 'beta', 'dd', 'sigma', 'k', 'Nsim', 'ysim',
-             'pvalue.mean', 'pvalue.sd', 'pvalue.fit'),
-    thin = 100),
-  # MCMCvis::MCMCsummary(mod_N_logistic_negbin,
-  #                      c('rate', 'beta', 'dd', 'sigma', 'k',
-  #                        'pvalue.mean', 'pvalue.sd', 'pvalue.fit'))
-  # MCMCvis::MCMCtrace(mod_N_logistic_negbin,
-  #                    params = c('rate', 'beta', 'dd', 'sigma', 'k'),
-  #                    pdf = FALSE)
-  # # fit very good; n.eff super low for rate, dd, beta[2] and beta[4]; trace plots for
-  # # these also terrible -- looks like a longer burn-in needed?
-  # plot_model_predictions(mod_N_logistic_negbin,
-  #                        year = c(2000:2019, 2000:2020),
-  #                        obsdat = modeldat, scale = 1, center = 0)
-  # # predictions very good...
-  # get_sumstats(mod_N_logistic_negbin, c('beta', 'dd'),
-  #              id = c(inputdatN$Bpredictors %>% names(), 'year', 'dd'))
-  # # strong effects of flow14_cum3 (+) and dd (-)
-
-  # > logistic negbin variable K----------
-  inputdatN2 = list(y = inputdatN$y,
-                    year = inputdatN$year,
-                    Bpredictors = inputdatN$Bpredictors[, c('flow14_annual', 'pdsi')],
-                    Kpredictors = inputdatN$Bpredictors[, 'flow14_cum3']),
-
-  mod_N_logistic_negbin_varK = fit_BANSpopgrowth_model(
-    inputdatN2, n.adapt = 5000, n.burnin = 20000, n.sample = 100000, n.chains = 3,
-    holdout = 0, type = 'N_logistic_negbin_varK',
-    vars = c('rate', 'beta', 'kappa', 'dd_intercept', 'sigma', 'sigma.d', 'dd',
-             'k', 'Nsim', 'ysim',
-             'pvalue.mean', 'pvalue.sd', 'pvalue.fit'),
-    thin = 50),
-  MCMCvis::MCMCsummary(mod_N_logistic_negbin_varK,
-                       c('rate', 'beta', 'kappa', 'dd_intercept',
-                         'sigma', 'sigma.d', 'k',
-                         'pvalue.mean', 'pvalue.sd', 'pvalue.fit'))
-  MCMCvis::MCMCtrace(mod_N_logistic_negbin_varK,
-                     params = c('rate', 'beta', 'kappa', 'dd_intercept',
-                                'sigma', 'sigma.d', 'k'),
-                     pdf = FALSE)
-  # fit ok; n.eff=0 for sigma.d? also low for rate, dd_intercept, kappa;
-  # trace plots a bit weird too
-  # --> note, the estimates for sigma.d and sigma are super tiny- need a different prior?
-  # also really small for kappa
-  plot_model_predictions(mod_N_logistic_negbin_varK,
-                         year = c(2000:2019, 2000:2020),
-                         obsdat = modeldat, scale = 1, center = 0)
-  # predictions reasonable
-  get_sumstats(mod_N_logistic_negbin_varK, c('beta', 'kappa', 'dd_intercept'),
-               id = c(inputdatN2$Bpredictors %>% names(), 'year',
-                      inputdatN2$Kpredictors %>% names(), 'dd'))
-  # strong effects of flow14_cum3 on density dependence (+) and of dd (-);
-  # expected suggestions of effects for flow14_annual (+ 82%), pdsi (+ 77%), and
-  # year (- 76%)
-  
-  plot_K_predictions(mod_N_logistic_negbin_varK,
-                     predictor = seq(400000, 10000000, 500000),
-                     obsdat = modeldat,
-                     scale = 1, center = 0)
 )
