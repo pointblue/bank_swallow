@@ -147,24 +147,29 @@ fit_BANSpopgrowth_model <- function(inputdata, n.adapt = 1000, n.burnin = 5000,
     # additional effect of density dependence
 
     for (i in 1:npred) {
-      e.pred[i] ~ dnorm(0, tau.p) #error in process model (treat as same across predictors)
+      #e.pred[i] ~ dnorm(0, tau.p) #error in process model (treat as same across predictors)
 
-      ypred[i, 1] ~ dnorm(mu.y.aflow[i], tau.o) #error in observation
-      mu.y.aflow[i] = r0 + beta[1] * predmatrix[i, 1] + e.pred[i]
+      ypred[i, 1] ~ dnorm(mu.ypred[i, 1], tau.o) #error in observation
+      mu.ypred[i, 1] = r0 + beta[1] * predmatrix[i, 1]
+      # + e.pred[i]
       
-      ypred[i, 2] ~ dnorm(mu.y.cflow[i], tau.o) #error in observation
-      mu.y.cflow[i] = r0 + beta[2] * predmatrix[i, 2] + e.pred[i]
+      ypred[i, 2] ~ dnorm(mu.ypred[i, 2], tau.o) #error in observation
+      mu.ypred[i, 2] = r0 + beta[2] * predmatrix[i, 2]
+      # + e.pred[i]
 
-      ypred[i, 3] ~ dnorm(mu.y.pdsi[i], tau.o) #error in observation
-      mu.y.pdsi[i] = r0 + beta[3] * predmatrix[i, 3] + e.pred[i]
+      ypred[i, 3] ~ dnorm(mu.ypred[i, 3], tau.o) #error in observation
+      mu.ypred[i, 3] = r0 + beta[3] * predmatrix[i, 3]
+      #+ e.pred[i]
 
-      ypred[i, 4] ~ dnorm(mu.y.t[i], tau.o) #error in observation
-      mu.y.t[i] = r0 + beta[4] * predmatrix[i, 4] + e.pred[i]
+      ypred[i, 4] ~ dnorm(mu.ypred[i, 4], tau.o) #error in observation
+      mu.ypred[i, 4] = r0 + beta[4] * predmatrix[i, 4]
+      # + e.pred[i]
       
       # effect of density dependence for diff pop sizes:
-      ypred[i, 5] ~ dnorm(mu.y.t[i], tau.o) #error in observation
-      mu.y.N[i] = r0 + k.pred[i] * predmatrix[i, 5] + e.pred[i]
-      k.pred[i] ~ dnorm(k0, tau.k) #variance in k
+      ypred[i, 5] ~ dnorm(mu.ypred[i, 5], tau.o) #error in observation
+      mu.ypred[i, 5] = r0 + k0 * predmatrix[i, 5] 
+      #+ e.pred[i]
+      # k.pred[i] ~ dnorm(k0, tau.k) #variance in k
     }
   }"
   
