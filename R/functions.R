@@ -27,7 +27,35 @@ compile_waterdat = function(dir, type, ...) {
   purrr::map_df(filelist, read_csv, ...)
 }
 
-get_drought_indices = function(datname, statecode = NULL, climdivcode = NULL) {
+cleanup_waterdat = function(df, mindays) {
+  df %>% 
+  select(STATION_ID, `DATE TIME`, VALUE) %>% 
+    mutate(VALUE = if_else(VALUE == '---' | VALUE < 0, NA_character_, VALUE),
+           VALUE = as.numeric(VALUE),
+           month = format(`DATE TIME`, '%m') %>% as.numeric(),
+           year = format(`DATE TIME`, '%Y') %>% as.numeric(),
+           WY = if_else(month < 10, year, year + 1)) %>% 
+    group_by(STATION_ID, WY) %>% 
+    add_count() %>% 
+    ungroup() %>% 
+    filter(n >= mindays)
+}
+
+calculate_annual_total = function (df, threshold = 0, mindays) {
+  df %>% 
+    # subtract threshold values
+    mutate(flow = if_else(VALUE > threshold, VALUE - threshold, 0)) %>% 
+    # calculate sum by station and water year
+    group_by(STATION_ID, WY) %>% 
+    summarize(ndays = length(VALUE[!is.na(VALUE)]),
+              flowtotal = sum(flow, na.rm = TRUE),
+              .groups = 'drop') %>% 
+    # check those with data for mindays each year
+    mutate(flowtotal = if_else(ndays < mindays, NA_real_, flowtotal))
+}
+
+
+get_drought_indices = function(datname) {
   # 04 = california
   
   url <- "ftp://ftp.ncdc.noaa.gov/pub/data/cirs/climdiv/"
@@ -37,24 +65,34 @@ get_drought_indices = function(datname, statecode = NULL, climdivcode = NULL) {
     filter(grepl(datname, name))
   dat <- try(RCurl::getURL(paste0(url, df$name[1]))) %>% 
     strsplit("   \\n")
-  res <- read_table(dat[[1]],
+  read_table(dat[[1]],
              col_names = c('ID', 'JAN', 'FEB', 'MAR', 'APR', 
                            'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 
                            'OCT', 'NOV', 'DEC')) %>% 
-    mutate(index = datname,
-           state = substr(ID, 1, 2),
+    mutate(index = datname)
+}
+
+cleanup_droughtdat = function(df, statecode = NULL, climdivcode = NULL) {
+  res <- df %>% 
+    mutate(state = substr(ID, 1, 2),
            climdiv = paste0(substr(ID, 3, 4)),
            year = substr(ID, 7, 10)) %>%
     pivot_longer(JAN:DEC, names_to = 'month', values_to = 'value') %>%
     mutate(climname = recode(climdiv, 
-                            `01` = "North Coast Drainage",
-                            `02` = "Sacramento Drainage",
-                            `03` = "Northeast Interior Basins",
-                            `04` = "Central Coast",
-                            `05` = "San Joaquin Drainage",
-                            `06` = "South Coast Drainage",
-                            `07` = "Southeast Desert Basin"),
+                             `01` = "North Coast Drainage",
+                             `02` = "Sacramento Drainage",
+                             `03` = "Northeast Interior Basins",
+                             `04` = "Central Coast",
+                             `05` = "San Joaquin Drainage",
+                             `06` = "South Coast Drainage",
+                             `07` = "Southeast Desert Basin"),
            date = as.Date(paste0(year, '-', month, '-01'), format = '%Y-%b-%d'),
+           month = format(date, '%m') %>% as.numeric(),
+           year = as.numeric(year),
+           WY = if_else(month >= 10, year + 1, year),
+           season = case_when(month >= 10 | month <= 3 ~ 'rainy',
+                              month >= 4 & month <= 8 ~ 'breeding',
+                              TRUE ~ NA_character_),
            value = case_when(value < -99.9 ~ NA_real_, 
                              TRUE ~ value)) %>%
     arrange(index, state, climdiv, date)
@@ -66,14 +104,6 @@ get_drought_indices = function(datname, statecode = NULL, climdivcode = NULL) {
     res <- res %>% filter(climdiv == climdivcode)
   }
   return(res)
-  ## Climate divisions within California:
-  ## 01: North Coast Drainage
-  ## 02: Sacramento Drainage
-  ## 03: Northeast Interior Basins
-  ## 04: Central Coast **TomKat**
-  ## 05: San Joaquin Drainage
-  ## 06: South Coast Drainage
-  ## 07: Southeast Desert Basin
 }
 
 get_sumstats = function(mod, param, id, prob = 0.95) {
@@ -89,7 +119,7 @@ get_sumstats = function(mod, param, id, prob = 0.95) {
     apply(samples, 2, function(x) 1-ecdf(x)(0)) %>% set_names(NULL),
     apply(samples, 2, function(x) ecdf(x)(0)) %>% set_names(NULL)
   ) %>% 
-    set_names('id', 'median', 'lci', 'uci', 'probg0', 'probl0')
+    set_names(c('id', 'median', 'lci', 'uci', 'probg0', 'probl0'))
 }
 
 plot_sumstats = function(mod, param, id, prob = 0.95) {
@@ -211,7 +241,7 @@ plot_cov_relationships = function(mod, inputdat, obsdat) {
   
   nm = names(inputdat$predmatrix)
   
-  scale_params = purrr::map_df(nm[1:4] %>% set_names(), 
+  scale_params = purrr::map_df(nm[1:4] %>% purrr::set_names(), 
                                function(x) {
                                  tibble(center = inputdat$Bpredictors %>% pull(x) %>% 
                                           attr(., 'scaled:center'),
@@ -222,14 +252,14 @@ plot_cov_relationships = function(mod, inputdat, obsdat) {
                      scale = sd(inputdat$N_obs, na.rm = TRUE)))
     
   # pull other stats:
-  predvalues = bind_cols(MCMCvis::MCMCpstr(mod, params = c('ypred'), 
+  predvalues = bind_cols(MCMCvis::MCMCpstr(mod, params = c('mu.ypred'), 
                                            func = function(x) mean(x)) %>%
                            purrr::map_df(as_tibble),
-                         MCMCvis::MCMCpstr(mod, params = c('ypred'),
+                         MCMCvis::MCMCpstr(mod, params = c('mu.ypred'),
                                            func = function(x) HDInterval::hdi(x, 0.95)) %>%
                            purrr::map_df(as_tibble)) %>%
-    set_names(paste(rep(nm, 3), rep(c('median', 'lower', 'upper'), each = 5),
-                    sep = '.')) %>% 
+    set_names(c(paste(rep(nm, 3), rep(c('median', 'lower', 'upper'), each = 5),
+                    sep = '.'))) %>% 
     mutate(index = c(1:nrow(.))) %>% 
     pivot_longer(-index) %>% 
     separate(name, into = c('cov', 'metric'), sep = '\\.') %>% 
@@ -239,7 +269,7 @@ plot_cov_relationships = function(mod, inputdat, obsdat) {
                 pivot_longer(-index) %>%
                 left_join(scale_params, by = c('name' = 'cov')) %>%
                 mutate(value = value * scale + center,
-                       value = case_when(name %in% c('flow14', 'flow14_3') ~ exp(value)/1000000,
+                       value = case_when(name %in% c('flow14', 'flow14_3') ~ (exp(value)-1)/1000000,
                                          TRUE ~ value)
                 ) %>%
                 select(index, name, value) %>%
@@ -256,7 +286,8 @@ plot_cov_relationships = function(mod, inputdat, obsdat) {
     geom_hline(aes(yintercept = 0), linetype = 'dashed') +
     geom_line() + geom_point() +
     geom_point(data = obsdat, aes(flow14/1000000, pgr), color = 'red') +
-    scale_x_log10() + ylim(-1, 1) +
+    # scale_x_log10() + 
+    ylim(-.75, .75) +
     labs(title = 'A', x = 'cfs (millions)', y = 'per-capita growth rate') +
     theme_classic()
   
@@ -265,8 +296,9 @@ plot_cov_relationships = function(mod, inputdat, obsdat) {
     geom_hline(aes(yintercept = 0), linetype = 'dashed') +
     geom_line() + geom_point() +
     geom_point(data = obsdat, aes(flow14_3/1000000, pgr), color = 'red') +
-    scale_x_log10() + ylim(-1, 1) +
-    labs(title = 'B', x = 'cfs (millions)', y = 'per-capita growth rate') +
+    # scale_x_log10() +
+    ylim(-.75, .75) +
+    labs(title = 'B', x = 'cfs (millions)', y = NULL) +
     theme_classic()
   
   c = ggplot(predvalues %>% filter(cov == 'mean.pdsi'), aes(value, median)) +
@@ -274,21 +306,30 @@ plot_cov_relationships = function(mod, inputdat, obsdat) {
     geom_hline(aes(yintercept = 0), linetype = 'dashed') +
     geom_line() + geom_point() +
     geom_point(data = obsdat, aes(pdsi, pgr), color = 'red') +
-    labs(title = 'C', x = 'PDSI', y = NULL) +
-    ylim(-1, 1) +
+    labs(title = 'C', x = 'PDSI', y = 'per-capita growth rate') +
+    ylim(-.75, .75) +
     theme_classic()
   
-  d = ggplot(predvalues %>% filter(cov == 't'), aes(value, median)) +
+  d = ggplot(predvalues %>% filter(cov == 'N'), aes(value, median)) +
+    geom_ribbon(aes(ymin = lower, ymax = upper), fill = 'gray80') + 
+    geom_hline(aes(yintercept = 0), linetype = 'dashed') +
+    geom_line() + geom_point() +
+    geom_point(data = obsdat, aes(burrows, pgr), color = 'red') +
+    labs(title = 'D', x = 'burrows', y = NULL) +
+    ylim(-.75, .75) +
+    theme_classic()
+  
+  e = ggplot(predvalues %>% filter(cov == 't'), aes(value, median)) +
     geom_ribbon(aes(ymin = lower, ymax = upper), fill = 'gray80') + 
     geom_hline(aes(yintercept = 0), linetype = 'dashed') +
     geom_line() + geom_point() +
     geom_point(data = obsdat, aes(year, pgr), color = 'red') +
-    labs(title = 'D', x = 'year', y = NULL) +
-    ylim(-1, 1) +
+    labs(title = 'E', x = 'year', y = 'per-capita growth rate') +
+    ylim(-.75, .75) +
     theme_classic()
   
   library(patchwork)
-  (a/b)|(c/d)
+  a + b + c + d + e + plot_layout(nrow = 3, byrow = TRUE)
 
 }
 
