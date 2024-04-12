@@ -2,9 +2,6 @@
 source('R/packages.R')
 source('R/functions.R')
 
-# update readme for github repo https://github.com/pointblue/bank_swallow
-readme_page = render_Rmd("Rmd/README.Rmd", "README.md")
-  
 # RESPONSE DATA--------
 # BANS survey data: annual burrow counts between river miles 144-243 (roughly
 # Colusa to Red Bluff); counts are the average of two separate counters'
@@ -16,11 +13,7 @@ birddat = read_csv('data/BANS_burrow_counts.csv', col_types = cols()) %>%
   complete(year = seq(min(year), max(year))) %>%
   # add new data for 2021 and 2022
   bind_rows(tibble(year = c(2021, 2022, 2023),
-                   burrows = c(20299, 11738, 7836))) %>% 
-  # calculate annual per-capita growth rate as the change in burrow count 
-  # >> from the previous year (this is a change from prior version!)
-  mutate(agr = burrows/lag(burrows),
-         pgr = (burrows - lag(burrows))/lag(burrows)) 
+                   burrows = c(20299, 11738, 7836)))
 
 write_csv(birddat, 'data/birddat.csv')
 # Note: no count data from 2006, so no agr/pgr calculated for 2005-06 or 2006-07
