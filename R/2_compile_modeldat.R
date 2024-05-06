@@ -124,8 +124,10 @@ corrplot::corrplot.mixed(
 ## riprap---------
 
 riprapdat = read_csv('data/riprapdat.csv') |> 
-  select(WY, riprap = riprap_spline) |> 
-  mutate(riprap1 = lag(riprap)) |> 
+  select(WY, riprap = riprap_approx) |> 
+  # convert m to km
+  mutate(riprap = riprap/1000,
+         riprap1 = lag(riprap)) |> 
   filter(WY > 1999 & WY < 2024)
 
 
@@ -162,3 +164,16 @@ corrplot::corrplot.mixed(
 #        breaks = 20)
 #   #hist(plogis(draws), freq = F, main = 'inverse logit of draws', breaks = 20)
 # }
+
+# Summary stats------------
+# note: flow data is in millions of cfs; riprap is in km
+cov_stats = modeldat |> select(WY, flowt:last_col()) |> 
+  pivot_longer(-WY) |> 
+  group_by(name) |> 
+  summarize(mean = mean(value, na.rm = TRUE),
+            median = median(value, na.rm = TRUE),
+            sd = sd(value, na.rm = TRUE),
+            max = max(value, na.rm = TRUE),
+            min = min(value, na.rm = TRUE),
+            .groups = 'drop')
+write_csv(cov_stats, 'output/cov_stats.csv')
