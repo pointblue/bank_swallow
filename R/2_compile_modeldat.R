@@ -2,7 +2,6 @@
 
 # load packages and functions
 source('R/packages.R')
-source('R/functions.R')
 
 # Generate model predictors----------
 
@@ -19,7 +18,7 @@ birddat = read_csv('data/birddat.csv') |>
   # >> *from the previous year* (this is a change from prior version!)
   mutate(agr = burrowst/burrowst1,
          pgr = (burrowst - burrowst1)/burrowst1) |> 
-  filter(WY > 1999)
+  filter(WY >= 1999)
 
 # check correlations:
 corrplot::corrplot.mixed(
@@ -59,7 +58,7 @@ flowdat = read_csv('data/flowdat.csv') |>
          flow14t3 = lag(flow14t, n = 3),
          # convert to cfs (millions)
          across(matches('^flow'), ~./1000000)) |> 
-  filter(WY > 1999) # match to birddat
+  filter(WY >= 1999) # match to birddat
 
 # check correlations:
 corrplot::corrplot.mixed(
@@ -113,7 +112,7 @@ droughtdat = read_csv('data/droughtdat.csv') |>
   group_by(WY) |>
   summarize(drought = mean(value), .groups = 'drop') |> 
   mutate(drought1 = lag(drought)) |> 
-  filter(WY > 1999)
+  filter(WY >= 1999)
 
 corrplot::corrplot.mixed(
   cor(droughtdat |> drop_na(), method = 'pearson'),
@@ -127,11 +126,11 @@ riprapdat = read_csv('data/riprapdat.csv') |>
   # convert m to km
   mutate(riprap = riprap/1000,
          riprap1 = lag(riprap)) |> 
-  filter(WY > 1999 & WY < 2024)
+  filter(WY >= 1999 & WY < 2024)
 
 
 # Compile predictors----------------
-
+# include 1999 data only for the purposes of the N-chain models
 modeldat = list(birddat,
                 flowdat,
                 droughtdat,
@@ -157,6 +156,7 @@ corrplot::corrplot.mixed(
 # Summary stats------------
 # note: flow data is in millions of cfs; riprap is in km
 cov_stats = modeldat |> 
+  filter(WY > 1999) |> 
   pivot_longer(-WY) |> 
   group_by(name) |> 
   summarize(mean = mean(value, na.rm = TRUE),
