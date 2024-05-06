@@ -4,8 +4,6 @@
 source('R/packages.R')
 source('R/functions.R')
 
-birddat = read_csv('data/birddat.csv')
-
 # Generate model predictors----------
 
 ## burrows and lag burrows-----
@@ -14,8 +12,9 @@ birddat = read_csv('data/birddat.csv')
 # 2000
 
 birddat = read_csv('data/birddat.csv') |> 
-  select(WY = year, burrowst = burrows) |> 
-  mutate(burrowst1 = lag(burrowst)) |> 
+  select(WY = year, burrowst = burrows) |>
+  mutate(burrowst = round(burrowst), # convert to integers
+         burrowst1 = lag(burrowst)) |> 
   # calculate annual per-capita growth rate as the change in burrow count 
   # >> *from the previous year* (this is a change from prior version!)
   mutate(agr = burrowst/burrowst1,
@@ -154,20 +153,10 @@ corrplot::corrplot.mixed(
 # ggplot(modeldat, aes(log(flow14t1))) + geom_density()
 # ggplot(modeldat, aes(flowt1)) + geom_density()
 # ggplot(modeldat, aes(log(flowt1))) + geom_density()
-# 
-# mean(modeldat$pgr, na.rm = TRUE) # mean = -0.017
-# var(modeldat$pgr, na.rm = TRUE) # var = 0.055
-
-# simulate = function(sigma) {
-#   draws = rnorm(10000, mean = 0, sd = sigma)
-#   hist(draws, freq = F, main = paste('random draws for var =', sigma),
-#        breaks = 20)
-#   #hist(plogis(draws), freq = F, main = 'inverse logit of draws', breaks = 20)
-# }
 
 # Summary stats------------
 # note: flow data is in millions of cfs; riprap is in km
-cov_stats = modeldat |> select(WY, flowt:last_col()) |> 
+cov_stats = modeldat |> 
   pivot_longer(-WY) |> 
   group_by(name) |> 
   summarize(mean = mean(value, na.rm = TRUE),
