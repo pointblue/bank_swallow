@@ -60,7 +60,8 @@ flowdat = read_csv('data/flowdat.csv') |>
          # convert to cfs (millions)
          across(matches('^flow'), ~./1000000)) |> 
   # add log transformations
-  mutate(across(matches('^flow'), ~log(. + 1), .names = 'log.{col}')) |> 
+  mutate(across(matches('^flowt'), ~log(.), .names = 'log.{col}'),
+         across(matches('^flow14'), ~log(. + 1), .names = 'log.{col}')) |> 
   filter(WY >= 1999) # match to birddat
 
 # check correlations:
@@ -148,9 +149,9 @@ corrplot::corrplot.mixed(
   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
 # strongest: 
 # >> WY and riprap perfectly correlated (of course)
-# - agr/pgr and: flowt1 (0.74-0.78), drought1 (0.65-0.68), 
-#     burrowst (0.58-0.61), burrowst1 (-0.47- -0.49)
-# - flowt and drought (0.57), burrowst (0.58)
+# - agr/pgr and: flowt1 (0.78), drought1 (0.68), 
+#     burrowst (0.58), burrowst1 (-0.49)
+# - flowt and drought (0.29), burrowst (0.54)
 # - flowt1 and drought1 (0.73)
 
 # any difference for threshold version of flow?
@@ -158,8 +159,8 @@ corrplot::corrplot.mixed(
   cor(modeldat %>% select(!starts_with('flowt') & !starts_with('log')) %>% drop_na(), 
       method = 'pearson'),
   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
-# - agr/pgr and: flow14t1 (0.70-0.76) (similar)
-# - flow14t & drought (0.52), burrowst (0.44)
+# - agr/pgr and: flow14t1 (0.76) (similar)
+# - flow14t & drought1 (0.17), burrowst (0.58)
 # - flow14t1 & drought1 (0.72)
 
 # any difference for log-transformed flow values?
@@ -167,8 +168,8 @@ corrplot::corrplot.mixed(
   cor(modeldat %>% select(!starts_with('flow') & !starts_with('log.flow14')) %>% drop_na(), 
       method = 'pearson'),
   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
-# - agr/pgr and: log.flowt1 (0.76-0.79) (similar, higher)
-# - burrows and: log.flowt1 (0.61)
+# - agr/pgr and: log.flowt1 (0.79) (similar)
+# - burrows and: log.flowt1 (0.62)
 
 # Summary stats------------
 # note: flow data is in millions of cfs; riprap is in km
