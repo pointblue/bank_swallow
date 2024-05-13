@@ -19,21 +19,19 @@ birddat = read_csv('data/birddat.csv') |>
   mutate(agr = burrows_orig/lag(burrows_orig),
          pgr = (burrows_orig - lag(burrows_orig))/lag(burrows_orig),
          log.agr = log(agr)) |> 
-  filter(WY >= 1999)
+  filter(WY >= 1997)
 
 # check correlations:
 corrplot::corrplot.mixed(
-  cor(birddat |> drop_na(), method = 'pearson'),
+  cor(birddat |> filter(WY>=2000) |> drop_na(), method = 'pearson'),
   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
-# burrowst moderately correlated with pgr (0.58)
-# burrowst1 moderately negatively correlated with agr/pgr (-0.49)
+# burrowst moderately correlated with agr/pgr (0.59)
+# burrowst1 moderately negatively correlated with agr/pgr (-0.43)
 
 ggplot(birddat, aes(agr)) + geom_density() + 
   geom_vline(xintercept = 1, col = 'red')
 
-mean(birddat$pgr, na.rm = TRUE) # mean = -0.017
-median(birddat$pgr, na.rm = TRUE) # median = 0.005
-var(birddat$pgr, na.rm = TRUE) # var = 0.055
+exp(mean(log(birddat$agr), na.rm = TRUE)) # mean = 0.978
 
 ## flow & lagged flow -------
 
@@ -62,7 +60,7 @@ flowdat = read_csv('data/flowdat.csv') |>
   # add log transformations
   mutate(across(matches('^flowt'), ~log(.), .names = 'log.{col}'),
          across(matches('^flow14'), ~log(. + 1), .names = 'log.{col}')) |> 
-  filter(WY >= 1999) # match to birddat
+  filter(WY >= 1997) # match to birddat
 
 # check correlations:
 corrplot::corrplot.mixed(
@@ -116,7 +114,7 @@ droughtdat = read_csv('data/droughtdat.csv') |>
   group_by(WY) |>
   summarize(drought = mean(value), .groups = 'drop') |> 
   mutate(drought1 = lag(drought)) |> 
-  filter(WY >= 1999)
+  filter(WY >= 1997)
 
 corrplot::corrplot.mixed(
   cor(droughtdat |> drop_na(), method = 'pearson'),
@@ -126,12 +124,13 @@ corrplot::corrplot.mixed(
 ## riprap---------
 
 riprapdat = read_csv('data/riprapdat.csv') |> 
-  select(WY, riprap = riprap_approx) |> 
+  select(WY, riprap = riprap_spline) |> 
   # convert m to km
   mutate(riprap = riprap/1000,
          riprap1 = lag(riprap)) |> 
-  filter(WY >= 1999 & WY < 2024)
+  filter(WY >= 1997 & WY < 2024)
 
+ggplot(riprapdat, aes(WY, riprap)) + geom_line()
 
 # Compile predictors----------------
 # include 1999 data only for the purposes of the N-chain models
@@ -144,32 +143,46 @@ write_csv(modeldat, 'data/modeldat.csv')
 
 # check for correlations among predictors
 corrplot::corrplot.mixed(
-  cor(modeldat %>% select(!starts_with('flow14t') & !starts_with('log')) %>% drop_na(), 
+  cor(modeldat |> filter(WY >= 2000) |> 
+        select(!starts_with('flow14t') & !starts_with('log')) %>% 
+        drop_na(), 
       method = 'pearson'),
   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
 # strongest: 
 # >> WY and riprap perfectly correlated (of course)
-# - agr/pgr and: flowt1 (0.78), drought1 (0.68), 
-#     burrowst (0.58), burrowst1 (-0.49)
-# - flowt and drought (0.29), burrowst (0.54)
-# - flowt1 and drought1 (0.73)
+# - agr/pgr and: flowt1 (0.73), drought1 (0.59), 
+#     burrowst (0.59), burrowst1 (-0.43)
+# - flowt and drought1 (0.27)
+# - flowt1 and drought1 (0.60)
 
 # any difference for threshold version of flow?
 corrplot::corrplot.mixed(
-  cor(modeldat %>% select(!starts_with('flowt') & !starts_with('log')) %>% drop_na(), 
+  cor(modeldat |> filter(WY >= 2000) |> 
+        select(!starts_with('flowt') & !starts_with('log')) |> 
+        drop_na(), 
       method = 'pearson'),
   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
-# - agr/pgr and: flow14t1 (0.76) (similar)
-# - flow14t & drought1 (0.17), burrowst (0.58)
-# - flow14t1 & drought1 (0.72)
+# - agr/pgr and: flow14t1 (0.71) (similar)
+# - flow14t1 & drought1 (0.56)
 
 # any difference for log-transformed flow values?
 corrplot::corrplot.mixed(
-  cor(modeldat %>% select(!starts_with('flow') & !starts_with('log.flow14')) %>% drop_na(), 
+  cor(modeldat |> filter(WY >= 2000) |> 
+        select(!starts_with('flow') & !starts_with('log.flow14')) %>% 
+        drop_na(), 
       method = 'pearson'),
   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
-# - agr/pgr and: log.flowt1 (0.79) (similar)
-# - burrows and: log.flowt1 (0.62)
+# - agr/pgr and: log.flowt1 (0.74) (similar)
+# - drought1 & log.flowt1 (0.66)
+
+# any evidence of long-term trends in covariates?
+summary(lm(log.agr ~ WY, modeldat |> filter(WY>=2000))) # log-normal; no trend
+summary(lm(log(burrows_orig) ~ WY, modeldat |> filter(WY>=2000))) # significant decline
+summary(lm(log.flowt ~ WY, modeldat)) # all years: *declining (p = 0.028)
+summary(lm(log.flow14t ~ WY, modeldat)) #all years: *declining (p = 0.028)
+summary(lm(drought ~ WY, modeldat |> filter(WY>=1999))) #no trend
+# >> no trend in agr, but burrow counts significantly declining, and flows
+# declining
 
 # Summary stats------------
 # note: flow data is in millions of cfs; riprap is in km
