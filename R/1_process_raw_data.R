@@ -1,6 +1,6 @@
 # load packages and functions
 source('R/packages.R')
-source('R/functions.R')
+source('R/functions_process_raw_data.R')
 
 # RESPONSE DATA--------
 # BANS survey data: annual burrow counts between river miles 144-243 (roughly
