@@ -3,7 +3,7 @@
 
 # load packages
 source('R/packages.R')
-
+source('R/functions_figs.R')
 modeldat = read_csv('data/modeldat.csv') |> filter(WY >= 1999)
 
 # explore variation in response vars
@@ -69,10 +69,7 @@ inputdat_r = list(
   
   # prior year flow (use log-transformed version)
   flowt1 = modeldat |> filter(WY > 1999) |> pull(log.flowt1) |> scale() |> 
-    as.vector(),
-
-  # annual trend
-  year = modeldat |> filter(WY > 1999) |> pull(WY) |> scale() |> as.vector()
+    as.vector()
 )
 
 ## simulation---------
@@ -122,12 +119,11 @@ MCMCvis::MCMCtrace(mod_r_res,
                    pdf = FALSE)
 
 # plot observed N with estimated N1, K1
-mod_r_N = MCMCvis::MCMCsummary(mod_r_res, c('N1', 'y.sim'), HPD = TRUE, pg0 = TRUE) %>% 
+MCMCvis::MCMCsummary(mod_r_res, c('N1'), HPD = TRUE, pg0 = TRUE) %>% 
   as_tibble(rownames = 'var', .name_repair = 'universal') %>%
   rename(lci = `..95._HPDL`, uci = `..95._HPDU`) %>% 
   mutate(var = gsub('\\[.*$', '', var),
-         WY = c(1999:2022,
-                1999:2022)) |>
+         WY = c(1999:2022)) |>
   # add observed data
   bind_rows(modeldat %>% select(WY, mean = burrowst) %>% mutate(var = 'observed')) %>%
   #filter(var != 'K') %>%
@@ -135,16 +131,16 @@ mod_r_N = MCMCvis::MCMCsummary(mod_r_res, c('N1', 'y.sim'), HPD = TRUE, pg0 = TR
   geom_ribbon(aes(ymin = lci, ymax = uci, fill = var), alpha = 0.5) +
   geom_line(aes(color = var)) + 
   geom_point(aes(color = var)) + 
-  scale_color_manual(values = c('observed' = 'red', 'N1' = 'blue4', 'y.sim' = 'gray40')) +
-  scale_fill_manual(values = c('N1' = 'lightblue4', 'y.sim' = 'gray70')) +
+  scale_color_manual(values = c('observed' = 'red', 'N1' = 'blue4')) +
+  scale_fill_manual(values = c('N1' = 'lightblue4')) +
   theme_bw() + ylim(0, NA) 
 
 # plot observed and estimated agr
-mod_r_agr = MCMCvis::MCMCsummary(mod_r_res, c('R', 'r.sim'), HPD = TRUE, pg0 = TRUE) %>% 
+MCMCvis::MCMCsummary(mod_r_res, c('R'), HPD = TRUE, pg0 = TRUE) %>% 
   as_tibble(rownames = 'var', .name_repair = 'universal') %>%
   rename(lci = `..95._HPDL`, uci = `..95._HPDU`) %>% 
   mutate(var = gsub('\\[.*$', '', var),
-         WY = c(2000:2023, 2000:2023)) %>% 
+         WY = c(2000:2023)) %>% 
   # add observed data
   bind_rows(modeldat %>% select(WY, mean = agr) %>% mutate(var = 'observed')) %>%
   #filter(var != 'K') %>%
@@ -152,8 +148,8 @@ mod_r_agr = MCMCvis::MCMCsummary(mod_r_res, c('R', 'r.sim'), HPD = TRUE, pg0 = T
   geom_ribbon(aes(ymin = lci, ymax = uci, fill = var), alpha = 0.5) +
   geom_line(aes(color = var)) + 
   geom_point(aes(color = var)) + 
-  scale_color_manual(values = c('observed' = 'red', 'R' = 'blue4', 'r.sim' = 'dodgerblue')) +
-  scale_fill_manual(values = c('R' = 'lightblue4', 'r.sim' = 'lightblue')) +
+  scale_color_manual(values = c('observed' = 'red', 'R' = 'blue4')) +
+  scale_fill_manual(values = c('R' = 'lightblue4')) +
   theme_bw() + ylim(0, NA) +
   geom_hline(aes(yintercept = 1), linetype = 'dashed')
 
@@ -177,10 +173,7 @@ inputdat_chain = list(
   y = modeldat |> pull(burrows_orig), #|> scale(center = FALSE) |> as.vector(),
   
   # prior year flow (use log-transformed version)
-  flowt1 = modeldat |> pull(log.flowt1) |> scale() |> as.vector(),
-  
-  # annual trend
-  year = modeldat |> pull(WY) |> scale() |> as.vector()
+  flowt1 = modeldat |> pull(log.flowt1) |> scale() |> as.vector()
 )
 
 ## simulation---------
@@ -194,8 +187,7 @@ y <- numeric(nyr)
 R <- numeric(nyr)
 
 # estimate priors (edit as needed)
-sigma.r <- modeldat |> drop_na() |> pull(agr) |> log() |> sd() # ~ 0.25
-sigma.p <- 0.05
+sigma.p <- modeldat |> drop_na() |> pull(agr) |> log() |> sd() # ~ 0.25
 sigma.o <- 0.05
 n[1] <- inputdat_chain$y[1]
 mu[1] <- n[1] # mean from deterministic model to simulate
@@ -204,7 +196,7 @@ R[1] <- modeldat$agr[1]
 
 # simulate values
 for (t in 2:length(inputdat_chain$y)) {
-  R[t] <- rlnorm(1, log(1.0005), sigma.r)
+  R[t] <- rlnorm(1, log(1.0005), sigma.p)
   mu[t] <- R[t] * n[t - 1]
   n[t] <- rlnorm(1, log(mu[t]), sigma.p)
   y[t] <- rlnorm(1, log(n[t]), sigma.o)
@@ -216,81 +208,28 @@ ggplot(modeldat, aes(WY, burrows_orig)) + geom_point() + geom_line() +
 
 ## fit model-----
 inits = list(
-  list(sigma.r = 0.40, sigma.p = 0.05, sigma.o = 0.01),
-  list(sigma.r = 0.25, sigma.p = 0.01, sigma.o = 0.10),
-  list(sigma.r = 0.10, sigma.p = 0.10, sigma.o = 0.05))
+  list(sigma.p = 0.05, sigma.o = 0.01),
+  list(sigma.p = 0.01, sigma.o = 0.10),
+  list(sigma.p = 0.10, sigma.o = 0.05))
 
-mod_Nchain = rjags::jags.model(file = 'models/0_mini_model_Nchain_v2.R',
+mod_Nchain = rjags::jags.model(file = 'models/0_mini_model_Nchain.R',
                                data = inputdat_chain,
                                n.adapt = 20000,
                                n.chains = 3,
                                inits = inits)
 update(mod_Nchain, n.iter = 20000)
 mod_Nchain_res = rjags::coda.samples(
-  mod_Nchain, variable.name = c('R', 'N', 'beta', 'rmax', 'sigma.r', 'sigma.o', 
-                                'sigma.p', 'y.sim', 'r.sim'), 
+  mod_Nchain, variable.name = c('R', 'N', 'beta', 'rmax', 'sigma.o', 
+                                'sigma.p', 'y.sim', 'N.sim', 'R.sim'), 
   n.iter = 100000, thin = 25)
 
 MCMCvis::MCMCsummary(mod_Nchain_res, 
-                     params = c('beta', 'rmax', 'sigma.r', 'sigma.o', 'sigma.p'), 
+                     params = c('beta', 'rmax', 'sigma.o', 'sigma.p'), 
                      HPD = TRUE, pg0 = TRUE)
 MCMCvis::MCMCtrace(mod_Nchain_res,
-                   params = c('beta', 'rmax', 'sigma.r', 'sigma.o', 'sigma.p'),
+                   params = c('beta', 'rmax', 'sigma.o', 'sigma.p'),
                    pdf = FALSE)
 
 # plot observed N with estimated n and K
-mod_Nchain_N = MCMCvis::MCMCsummary(mod_Nchain_res, c('N', 'y.sim'), HPD = TRUE, pg0 = TRUE) %>% 
-  as_tibble(rownames = 'var', .name_repair = 'universal') %>%
-  rename(lci = `..95._HPDL`, uci = `..95._HPDU`) %>% 
-  mutate(var = gsub('\\[.*$', '', var),
-         WY = c(1999:2023,
-                #1999:2022,
-                2000:2023)) %>% 
-  # add observed data
-  bind_rows(modeldat %>% select(WY, mean = burrowst) %>% mutate(var = 'observed')) %>%
-  #filter(var != 'K') %>%
-  ggplot(aes(WY, mean)) + 
-  geom_ribbon(aes(ymin = lci, ymax = uci, fill = var), alpha = 0.5) +
-  geom_line(aes(color = var)) + 
-  geom_point(aes(color = var)) + 
-  scale_color_manual(values = c('observed' = 'red', 'N' = 'blue4', 'y.sim' = 'dodgerblue')) +
-  scale_fill_manual(values = c('N' = 'lightblue4', 'y.sim' = 'lightblue')) +
-  theme_bw() + ylim(0, NA) #+
-  #facet_wrap(~var, ncol = 1)
-# now N1 and N directly depend on each other
+plot_observed_predicted(mod_Nchain_res, obsdat = modeldat, HPD = TRUE, pg0 = TRUE)
 
-# >> N-chain option seems a lot cleaner/simpler, but n.eff is tiny; might
-# require excessive iterations
-
-# plot observed and estimated agr
-mod_Nchain_agr = MCMCvis::MCMCsummary(mod_Nchain_res, c('R', 'r.sim'), HPD = TRUE, pg0 = TRUE) %>% 
-  as_tibble(rownames = 'var', .name_repair = 'universal') %>%
-  rename(lci = `..95._HPDL`, uci = `..95._HPDU`) %>% 
-  mutate(var = gsub('\\[.*$', '', var),
-         WY = c(2000:2023, 2000:2023)) %>% 
-  # add observed data
-  bind_rows(modeldat %>% select(WY, mean = agr) %>% mutate(var = 'observed')) %>%
-  #filter(var != 'K') %>%
-  ggplot(aes(WY, mean)) + 
-  geom_ribbon(aes(ymin = lci, ymax = uci, fill = var), alpha = 0.5) +
-  geom_line(aes(color = var)) + 
-  geom_point(aes(color = var)) + 
-  scale_color_manual(values = c('observed' = 'red', 'R' = 'blue4', 'r.sim' = 'dodgerblue')) +
-  scale_fill_manual(values = c('R' = 'lightblue4', 'r.sim' = 'lightblue')) +
-  theme_bw() + ylim(0, NA) +
-  geom_hline(aes(yintercept = 1), linetype = 'dashed') #+
-#facet_wrap(~var, ncol = 1)
-#
-
-
-# compare----------
-library(patchwork)
-mod_r_agr/mod_Nchain_agr # these look extremely (suspiciously?) similar!
-mod_r_N/mod_Nchain_N # variance in Nchain model looks more reasonable (suspiciously narrow for agr)
-
-MCMCvis::MCMCsummary(mod_r_res, 
-                     params = c('beta', 'rmax', 'sigma.o', 'sigma.r'), 
-                     HPD = TRUE, pg0 = TRUE)
-MCMCvis::MCMCsummary(mod_Nchain_res, 
-                     params = c('beta', 'rmax', 'sigma.r', 'sigma.o', 'sigma.p'), 
-                     HPD = TRUE, pg0 = TRUE)
