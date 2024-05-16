@@ -1,15 +1,14 @@
-Bank Swallow
-============
+# Bank Swallow
 
-Analysis of Bank Swallow population trends and sources of annual
-variation.
+Analysis of Bank Swallow population dynamics on the Sacramento River,
+based on annual burrow count surveys (1999-2023). Evaluation of effects
+of river flow (including lagged effects), density dependence, and
+long-term trends on annual population growth rates.
 
-CURRENT STATUS
---------------
+## CURRENT STATUS
 
-In development
+Analysis and manuscript in development
 
-CORE PROJECT TEAM
------------------
+## CORE PROJECT TEAM
 
-Kristen Dybala, Greg Golet
+Kristen Dybala (Point Blue), Greg Golet (The Nature Conservancy)
