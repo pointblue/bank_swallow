@@ -100,7 +100,7 @@ inits_r = list(
   list(sigma.r = 0.25),
   list(sigma.r = 0.10))
 
-mod_r = rjags::jags.model(file = 'models/0_mini_model_R.R',
+mod_r = rjags::jags.model(file = 'models/A_mini_model_R.R',
                           data = inputdat_r,
                           n.adapt = 20000,
                           n.chains = 3,
@@ -212,7 +212,7 @@ inits = list(
   list(sigma.p = 0.01, sigma.o = 0.10),
   list(sigma.p = 0.10, sigma.o = 0.05))
 
-mod_Nchain = rjags::jags.model(file = 'models/0_mini_model_Nchain.R',
+mod_Nchain = rjags::jags.model(file = 'models/A_mini_model_Nchain.R',
                                data = inputdat_chain,
                                n.adapt = 20000,
                                n.chains = 3,
