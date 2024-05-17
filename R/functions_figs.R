@@ -150,7 +150,7 @@ plot_partial_effects = function(dat, obsdat,
     geom_hline(aes(yintercept = 1), linetype = 'dashed'),
     scale_y_continuous(limits = ylim, expand = c(0, 0)),
     geom_text(aes(x = -Inf, y = Inf, label = problab), 
-              size = 3, hjust = -.1, vjust = 1.2, fontface = 'plain'),
+              size = 3, hjust = -.1, vjust = 1.5, fontface = 'plain'),
     theme_bw(),
     theme(panel.grid = element_blank(),
           strip.background = element_blank(),
@@ -215,6 +215,6 @@ plot_partial_effects = function(dat, obsdat,
   #   theme_classic() + guides(x = "none", y = "none")
   
   library(patchwork)
-  wrap_plots(a,b,c,d, ncol = 2, byrow = TRUE) +
+  wrap_plots(a,b,c,d, ncol = 1, byrow = TRUE) +
     plot_layout(axis_titles = 'collect', axes = 'collect')
 }
