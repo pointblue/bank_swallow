@@ -91,12 +91,12 @@ plot_observed_predicted = function(mod, obsdat, params = c('N', 'R'),
 compile_partial_effects = function(mod, param = 'R.pred', covariates, predicted) {
   
   scale_params = tibble(
-    varname = covariates %>% names(),
-    center = covariates %>% map_dbl(attr_getter("scaled:center")),
-    scale = covariates %>% map_dbl(attr_getter("scaled:scale"))
+    varname = covariates |> names(),
+    center = covariates |> purrr::map_dbl(attr_getter("scaled:center")),
+    scale = covariates |> purrr::map_dbl(attr_getter("scaled:scale"))
   )
   
-  backtransform = predicted[,2:5] |> 
+  backtransform = predicted |> select(-N) |>  
     mutate(index = c(1:dim(predicted)[1])) |> 
     pivot_longer(-index, names_to = 'varname') |> 
     left_join(scale_params, by = 'varname') |> 
@@ -121,7 +121,7 @@ compile_partial_effects = function(mod, param = 'R.pred', covariates, predicted)
     mutate(var = gsub('\\[.*$', '', var),
            varname = rep(c(names(predicted)), each = 11),
            index = rep(c(1:dim(predicted)[1]), 
-                       times = ncol(inputdat1$predmatrix))) |> 
+                       times = dim(predicted)[2])) |> 
     left_join(backtransform, by = c('index', 'varname')) |> 
     left_join(modsum |> select(varname, pg0 = `p>0`), by = 'varname') |> 
     mutate(varname = gsub('log.', '', varname))
@@ -132,112 +132,89 @@ compile_partial_effects = function(mod, param = 'R.pred', covariates, predicted)
 plot_partial_effects = function(dat, obsdat, 
                                 var.order = c('flowt', 'flowt1', 'drought1', 'N', 'WY'),
                                 labels = c('A', 'B', 'C', 'D', 'E'),
-                                ylim = c(0, 2)) {
+                                ylim = c(0, 2),
+                                year_label = NULL) {
   
   dat = dat |> 
     mutate(problab = paste0('P{\u03b2 > 0} = ', format(pg0, nsmall = 2)),
            problab = if_else(pg0 >= 0.9 | pg0 <= 0.1, paste0(problab, '*'), problab))
   
-  a = dat |> filter(varname == 'flowt') |> 
-    ggplot(aes(value_orig, mean)) + 
-    geom_ribbon(aes(ymin = lci, ymax = uci), fill = 'gray80') +
-    geom_line() + 
-    geom_point(data = obsdat |> filter(WY > 1999) |> 
-                 select(value_orig = 'flowt', mean = agr),
-               color = 'black') + 
-    geom_hline(aes(yintercept = 1), linetype = 'dashed') +
-    scale_y_continuous(limits = ylim, expand = c(0, 0)) +
+  obsdat1 = obsdat |> select(any_of(var.order), N = burrows_orig, mean = agr) |> 
+    mutate(N = lag(N)) |> filter(WY > 1999) |> 
+    pivot_longer(-c('mean', 'WY'), names_to = 'varname', values_to = 'value_orig') |> 
+    drop_na()
+  
+  default.plot = list(
+    geom_ribbon(aes(ymin = lci, ymax = uci), fill = 'gray80'),
+    geom_line(),
+    geom_hline(aes(yintercept = 1), linetype = 'dashed'),
+    scale_y_continuous(limits = ylim, expand = c(0, 0)),
+    geom_text(aes(x = -Inf, y = Inf, label = problab), 
+              size = 3, hjust = -.1, vjust = 1.2, fontface = 'plain'),
+    theme_bw(),
+    theme(panel.grid = element_blank(),
+          strip.background = element_blank(),
+          strip.text = element_text(hjust = 0)))
+  
+  a = dat |> filter(varname == 'flowt') |> ggplot(aes(value_orig, mean)) + 
+    default.plot +
+    geom_point(data = obsdat1 |> filter(varname == 'flowt'), color = 'black') + 
     scale_x_continuous(limits = c(1.5, 8.5), breaks = seq(0, 10, 2)) +
-    geom_text(aes(x = Inf, y = Inf, label = problab), hjust = 1.1, vjust = 2) +
-    labs(x = 'cfs (millions)', y = 'Annual growth rate (%)', title = 'A') +
-    theme_bw() +
-    theme(panel.grid = element_blank(),
-          strip.background = element_blank(),
-          strip.text = element_text(hjust = 0))
+    labs(x = 'cfs (millions)', y = 'Annual growth rate (%)', title = 'A')
   
-  b = dat |> filter(varname == 'flowt1') |> 
-    filter(value_orig < 8.5) |> 
-    ggplot(aes(value_orig, mean)) + 
-    geom_ribbon(aes(ymin = lci, ymax = uci), fill = 'gray80') +
-    geom_line() + 
-    geom_point(data = obsdat |> filter(WY > 1999) |> 
-                 select(value_orig = 'flowt1', mean = agr),
-               color = 'black') + 
-    geom_text(aes(x = Inf, y = Inf, label = problab), hjust = 1.1, vjust = 2) +
-    geom_hline(aes(yintercept = 1), linetype = 'dashed') +
-    scale_y_continuous(limits = ylim, expand = c(0, 0)) +
+  b = dat |> filter(varname == 'flowt1') |> ggplot(aes(value_orig, mean)) + 
+    default.plot +
+    geom_point(data = obsdat1 |> filter(varname == 'flowt1'), color = 'black') +
     scale_x_continuous(limits = c(1.5, 8.5), breaks = seq(0, 10, 2)) +
-    labs(x = 'cfs (t-1, millions)', y = 'Annual growth rate (%)', title = 'B') +
-    theme_bw() +
-    theme(panel.grid = element_blank(),
-          strip.background = element_blank(),
-          strip.text = element_text(hjust = 0))
+    labs(x = 'cfs (t-1, millions)', y = 'Annual growth rate (%)', title = 'B')
   
-  c = dat |> filter(varname == 'drought1') |> 
-    ggplot(aes(value_orig, mean)) + 
-    geom_ribbon(aes(ymin = lci, ymax = uci), fill = 'gray80') +
-    geom_line() + 
-    geom_point(data = obsdat |> filter(WY > 1999) |> 
-                 select(value_orig = 'drought1', mean = agr),
-               color = 'black') + 
-    geom_text(aes(x = Inf, y = Inf, label = problab), hjust = 1.1, vjust = 2) +
-    geom_hline(aes(yintercept = 1), linetype = 'dashed') +
-    scale_y_continuous(limits = ylim, expand = c(0, 0)) +
-    scale_x_continuous(limits = c(-6, 6), breaks = seq(-6, 6, 2)) +
-    labs(x = 'PDSI (t-1)', y = 'Annual growth rate (%)', title = 'C') +
-    theme_bw() +
-    theme(panel.grid = element_blank(),
-          strip.background = element_blank(),
-          strip.text = element_text(hjust = 0))
+  c = dat |> filter(varname == 'drought1') |> ggplot(aes(value_orig, mean)) + 
+    default.plot +
+    geom_point(data = obsdat1 |> filter(varname == 'drought1'), color = 'black') + 
+    scale_x_continuous(limits = c(-6, 4), breaks = seq(-6, 4, 2)) +
+    labs(x = 'PDSI (t-1)', y = 'Annual growth rate (%)', title = 'C')
   
-  d = dat |> filter(varname == 'N') |> 
-    ggplot(aes(value_orig/1000, mean)) + 
-    geom_ribbon(aes(ymin = lci, ymax = uci), fill = 'gray80') +
-    geom_line() + 
-    geom_point(data = obsdat |> 
-                 select(WY, burrows_orig, mean = agr) |> 
-                 mutate(value_orig = lag(burrows_orig)) |> 
-                 filter(WY > 1999) |> 
-                 select(mean, value_orig) |> drop_na(),
-               color = 'black') + 
-    geom_text(aes(x = Inf, y = Inf, label = problab), hjust = 1.1, vjust = 2) +
-    geom_hline(aes(yintercept = 1), linetype = 'dashed') +
-    scale_y_continuous(limits = ylim, expand = c(0, 0)) +
+  d = dat |> filter(varname == 'N') |> ggplot(aes(value_orig/1000, mean)) + 
+    default.plot +
+    geom_point(data = obsdat1 |> filter(varname == 'N'), color = 'black') + 
     scale_x_continuous(limits = c(10, 21), breaks = seq(10, 25, 5)) +
     labs(x = 'Burrow count (t-1, thousands)', y = 'Annual growth rate (%)',
-         title = 'D') +
-    theme_bw() +
-    theme(panel.grid = element_blank(),
-          strip.background = element_blank(),
-          strip.text = element_text(hjust = 0))
+         title = 'D')
   
-  e = dat |> filter(varname == 'WY') |> 
-    ggplot(aes(value_orig, mean)) + 
-    geom_ribbon(aes(ymin = lci, ymax = uci), fill = 'gray80') +
-    geom_line() + 
-    geom_point(data = obsdat |> filter(WY > 1999) |> 
-                 select(value_orig = 'WY', mean = agr) |> drop_na(),
-               color = 'black') + 
-    geom_text(aes(x = Inf, y = Inf, label = problab), hjust = 1.1, vjust = 2) +
-    geom_hline(aes(yintercept = 1), linetype = 'dashed') +
-    scale_y_continuous(limits = ylim, expand = c(0, 0)) +
-    scale_x_continuous(limits = c(2000, 2023),
-                       breaks = seq(2000, 2023, 4),
-                       minor_breaks = seq(2000, 2023, 1),
-                       labels = seq(2000, 2023, 4),
-                       guide = guide_axis(minor.ticks = TRUE)) +
-    labs(x = NULL, y = 'Annual growth rate (%)', title = 'E') +
-    theme_bw() +
-    theme(panel.grid = element_blank(),
-          strip.background = element_blank(),
-          strip.text = element_text(hjust = 0))
+  # >> duplicates observed_predicted plot
+  # e = dat |> filter(varname == 'WY') |> ggplot(aes(value_orig, mean)) + 
+  #   default.plot +
+  #   geom_point(data = obsdat1 |> select(value_orig = WY, mean) |> distinct(), 
+  #              color = 'black') + 
+  #   geom_line(data = obsdat1 |> select(value_orig = WY, mean) |> distinct()) + 
+  #   scale_x_continuous(limits = c(1999, 2023),
+  #                      breaks = seq(1999, 2023, 4),
+  #                      minor_breaks = seq(2000, 2023, 1),
+  #                      labels = seq(1999, 2023, 4),
+  #                      guide = guide_axis(minor.ticks = TRUE)) +
+  #   labs(x = NULL, y = 'Annual growth rate (%)', title = 'E')
   
-  blanklabelplot = ggplot() + labs(y = "Annual growth rate (%)", x = NULL) + 
-    theme_classic() + guides(x = "none", y = "none")
+  if (!is.null(year_label)) {
+    library(ggrepel)
+    a = a + geom_text_repel(data = obsdat1 |> 
+                        filter(varname == 'flowt' & WY %in% year_label),
+                      aes(label = WY), size = 3, box.padding = 0.1)
+    b = b + geom_text_repel(data = obsdat1 |> 
+                        filter(varname == 'flowt1' & WY %in% year_label),
+                      aes(label = WY), size = 3, box.padding = 0.1)
+    c = c + geom_text_repel(data = obsdat1 |> 
+                        filter(varname == 'drought1' & WY %in% year_label),
+                      aes(label = WY), size = 3, box.padding = 0.1)
+    d = d + geom_text_repel(data = obsdat1 |> 
+                        filter(varname == 'N' & WY %in% year_label),
+                      aes(label = WY), size = 3, box.padding = 0.1)
+    # does not apply to plot E
+  }
+  
+  # blanklabelplot = ggplot() + labs(y = "Annual growth rate (%)", x = NULL) + 
+  #   theme_classic() + guides(x = "none", y = "none")
   
   library(patchwork)
-  wrap_plots(a,b,c,d,e, blanklabelplot, ncol = 2, byrow = TRUE)+
-  #a + b + c + d + e + blanklabelplot +
+  wrap_plots(a,b,c,d, ncol = 2, byrow = TRUE) +
     plot_layout(axis_titles = 'collect', axes = 'collect')
-    #plot_annotation(tag_levels = 'A')
 }
