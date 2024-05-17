@@ -47,10 +47,10 @@ inputdat_final = list(
     mutate_all(~scale(.)),
   
   # range of scaled values for each predictor
-  predmatrix = tibble(log.flowt = seq(-1.6, 1.7, length.out = 11),
-                      log.flowt1 = seq(-1.6, 1.7, length.out = 11),
-                      drought1 = seq(-1.7, 2.5, length.out = 11),
-                      WY = seq(-1.45, 1.65, length.out = 11),
+  predmatrix = tibble(log.flowt = seq(-1.68, 1.99, length.out = 11),
+                      log.flowt1 = seq(-1.60, 1.73, length.out = 11),
+                      drought1 = seq(-1.70, 1.65, length.out = 11),
+                      WY = seq(-1.63, 1.63, length.out = 11),
                       N = seq(10000, 21000, length.out = 11)),
   npred = 11
 )
@@ -76,12 +76,12 @@ MCMCvis::MCMCsummary(mod_res_final,
                      params = c('beta', 'rmax', 'sigma.o', 'sigma.p'), 
                      HPD = TRUE, pg0 = TRUE)
 # convergence good, n.eff good
-# beta1 (flowt) may still be negative (p=0.24)
+# beta1 (flowt) may still be negative (p=0.23)
 # beta2 (flowt1) still positive (p=0.99)
 # beta3 (drought1) still neutral (p=0.55 to be positive)
-# beta4 (long-term trend) still neutral (p=0.51)
+# beta4 (long-term trend) still neutral (p=0.50)
 # beta5 (density dependence) negative (p=0.98)
-# rmax 0.47 (on the log scale)
+# rmax 0.48 (on the log scale)
 
 MCMCvis::MCMCtrace(mod_res_final,
                    params = c('beta', 'rmax', 'sigma.r', 'sigma.o', 'sigma.p'),
@@ -103,11 +103,6 @@ MCMCvis::MCMCplot(mod_res_final,
 e = MCMCpstr(mod_res_final, params = "e", func = mean)
 acf(e$e)
 # still no evidence of autocorrelation
-
-# OBSERVED VS PREDICTED
-plot_observed_predicted(mod_res_final, obsdat = modeldat, 
-                        HPD = TRUE, pg0 = TRUE)
-# still looks the same
 
 ## ESTIMATE K?--------
 # K ~ -rmax/beta[5]
