@@ -51,7 +51,7 @@ inputdat_final = list(
                       log.flowt1 = seq(-1.60, 1.73, length.out = 11),
                       drought1 = seq(-1.70, 1.65, length.out = 11),
                       WY = seq(-1.63, 1.63, length.out = 11),
-                      N = seq(10000, 21000, length.out = 11)),
+                      N = seq(10000, 21000, length.out = 11)/1000),
   npred = 11
 )
 
@@ -78,13 +78,13 @@ MCMCvis::MCMCsummary(mod_res_final,
 # convergence good, n.eff good
 # beta1 (flowt) may still be negative (p=0.23)
 # beta2 (flowt1) still positive (p=0.99)
-# beta3 (drought1) still neutral (p=0.55 to be positive)
-# beta4 (long-term trend) still neutral (p=0.50)
-# beta5 (density dependence) negative (p=0.98)
+# beta3 (drought1) still neutral (p=0.56 to be positive)
+# beta4 (long-term trend) still neutral (p=0.51)
+# beta5 (density dependence) negative (p=0.99)
 # rmax 0.48 (on the log scale)
 
 MCMCvis::MCMCtrace(mod_res_final,
-                   params = c('beta', 'rmax', 'sigma.r', 'sigma.o', 'sigma.p'),
+                   params = c('beta', 'rmax', 'sigma.o', 'sigma.p'),
                    pdf = FALSE)
 # trace plots could be a bit better for beta[1] and rmax, but rmax no longer
 # bumping up against 1 after extending range for prior to -2 to 2 (from -1 to 1)

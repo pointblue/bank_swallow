@@ -44,7 +44,8 @@ model {
       beta[2] * predictors[t, 2] + #flowt1
       beta[3] * predictors[t, 3] + #drought1
       beta[4] * predictors[t, 4] + #long-term trend
-      beta[5] * N[t-1]  # effect of density dependence (~ -rmax/K) 
+      beta[5] * N[t-1]/1000  # effect of density dependence (~ -rmax/K) 
+    # (divide by 1000 to put the Beta on a more similar scale to the others)
   }
   
   # model checking for every year of modeled data:
@@ -82,7 +83,7 @@ model {
   for (i in 1:npred) {
     
     for (j in 1:4) { # include effect of density dependence at median pop size
-      log(R.pred[i,j]) = rmax + beta[j] * predmatrix[i,j] + beta[5]*15000
+      log(R.pred[i,j]) = rmax + beta[j] * predmatrix[i,j] + beta[5]*15000/1000
     }
     
     log(R.pred[i,5]) = rmax + beta[5] * predmatrix[i,5] #effect of density dependence
