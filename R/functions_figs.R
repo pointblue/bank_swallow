@@ -130,17 +130,23 @@ compile_partial_effects = function(mod, param = 'R.pred', covariates, predicted)
 }
 
 plot_partial_effects = function(dat, obsdat, 
-                                var.order = c('flowt', 'flowt1', 'drought1', 'N', 'WY'),
+                                #var.order = c('flowt', 'flowt1', 'drought1', 'N', 'WY'),
+                                var.label = c('Total stream flow (t, cfs, millions)', 
+                                              'Prior total stream flow (t-1, cfs, millions)',
+                                              'Prior breeding season drought (t-1, PDSI)',
+                                              'Prior burrow count (t-1, thousands)'),
                                 labels = c('A', 'B', 'C', 'D', 'E'),
                                 ylim = c(0, 2),
+                                pg0 = TRUE,
                                 year_label = NULL) {
   
-  dat = dat |> 
+  problab = dat |> select(varname, pg0) |> distinct() |> 
     mutate(problab = paste0('P{\u03b2 > 0} = ', format(pg0, nsmall = 2)),
            problab = if_else(pg0 >= 0.9 | pg0 <= 0.1, paste0(problab, '*'), problab))
   
-  obsdat1 = obsdat |> select(any_of(var.order), N = burrows_orig, mean = agr) |> 
-    mutate(N = lag(N)) |> filter(WY > 1999) |> 
+  obsdat1 = obsdat |> 
+    select(WY, flowt, flowt1, drought1, N = burrows_orig, mean = agr) |> 
+    mutate(N = lag(N)/1000) |> filter(WY > 1999) |> 
     pivot_longer(-c('mean', 'WY'), names_to = 'varname', values_to = 'value_orig') |> 
     drop_na()
   
@@ -149,36 +155,37 @@ plot_partial_effects = function(dat, obsdat,
     geom_line(),
     geom_hline(aes(yintercept = 1), linetype = 'dashed'),
     scale_y_continuous(limits = ylim, expand = c(0, 0)),
-    geom_text(aes(x = -Inf, y = Inf, label = problab), 
-              size = 3, hjust = -.1, vjust = 1.5, fontface = 'plain'),
     theme_bw(),
     theme(panel.grid = element_blank(),
           strip.background = element_blank(),
-          strip.text = element_text(hjust = 0)))
+          strip.text = element_text(hjust = 0),
+          axis.text = element_text(size = 8),
+          axis.title = element_text(size = 10),
+          plot.title = element_text(size = 10)))
   
   a = dat |> filter(varname == 'flowt') |> ggplot(aes(value_orig, mean)) + 
     default.plot +
     geom_point(data = obsdat1 |> filter(varname == 'flowt'), color = 'black') + 
-    scale_x_continuous(limits = c(1.5, 8.5), breaks = seq(0, 10, 2)) +
-    labs(x = 'cfs (millions)', y = 'Annual growth rate (%)', title = 'A')
+    scale_x_continuous(limits = c(1, 9), breaks = seq(0, 10, 1)) +
+    labs(x = var.label[1], y = 'Annual growth rate (%)', title = 'A')
   
   b = dat |> filter(varname == 'flowt1') |> ggplot(aes(value_orig, mean)) + 
     default.plot +
     geom_point(data = obsdat1 |> filter(varname == 'flowt1'), color = 'black') +
-    scale_x_continuous(limits = c(1.5, 8.5), breaks = seq(0, 10, 2)) +
-    labs(x = 'cfs (t-1, millions)', y = 'Annual growth rate (%)', title = 'B')
+    scale_x_continuous(limits = c(1, 9), breaks = seq(0, 10, 1)) +
+    labs(x = var.label[2], y = 'Annual growth rate (%)', title = 'B')
   
   c = dat |> filter(varname == 'drought1') |> ggplot(aes(value_orig, mean)) + 
     default.plot +
     geom_point(data = obsdat1 |> filter(varname == 'drought1'), color = 'black') + 
     scale_x_continuous(limits = c(-6, 4), breaks = seq(-6, 4, 2)) +
-    labs(x = 'PDSI (t-1)', y = 'Annual growth rate (%)', title = 'C')
+    labs(x = var.label[3], y = 'Annual growth rate (%)', title = 'C')
   
-  d = dat |> filter(varname == 'N') |> ggplot(aes(value_orig/1000, mean)) + 
+  d = dat |> filter(varname == 'N') |> ggplot(aes(value_orig, mean)) + 
     default.plot +
     geom_point(data = obsdat1 |> filter(varname == 'N'), color = 'black') + 
-    scale_x_continuous(limits = c(10, 21), breaks = seq(10, 25, 5)) +
-    labs(x = 'Burrow count (t-1, thousands)', y = 'Annual growth rate (%)',
+    scale_x_continuous(limits = c(10, 21), breaks = seq(10, 25, 1)) +
+    labs(x = var.label[4], y = 'Annual growth rate (%)',
          title = 'D')
   
   # >> duplicates observed_predicted plot
@@ -194,20 +201,56 @@ plot_partial_effects = function(dat, obsdat,
   #                      guide = guide_axis(minor.ticks = TRUE)) +
   #   labs(x = NULL, y = 'Annual growth rate (%)', title = 'E')
   
+  if (pg0) {
+    a = a + geom_text(data = problab |> filter(varname == 'flowt'), 
+                      aes(x = -Inf, y = Inf, label = problab), 
+                      size = 3, hjust = -.1, vjust = 1.5, fontface = 'plain')
+    b = b + geom_text(data = problab |> filter(varname == 'flowt1'), 
+                      aes(x = -Inf, y = Inf, label = problab), 
+                      size = 3, hjust = -.1, vjust = 1.5, fontface = 'plain')
+    c = c + geom_text(data = problab |> filter(varname == 'drought1'), 
+                      aes(x = -Inf, y = Inf, label = problab), 
+                      size = 3, hjust = -.1, vjust = 1.5, fontface = 'plain')
+    d = d + geom_text(data = problab |> filter(varname == 'N'), 
+                      aes(x = -Inf, y = Inf, label = problab), 
+                      size = 3, hjust = -.1, vjust = 1.5, fontface = 'plain')
+  }
+  
   if (!is.null(year_label)) {
     library(ggrepel)
-    a = a + geom_text_repel(data = obsdat1 |> 
+    a = a + 
+      geom_point(data = obsdat1 |> 
+                   filter(varname == 'flowt' & WY %in% year_label),
+                 col = 'red') +
+      geom_text_repel(data = obsdat1 |> 
                         filter(varname == 'flowt' & WY %in% year_label),
-                      aes(label = WY), size = 3, box.padding = 0.1)
-    b = b + geom_text_repel(data = obsdat1 |> 
+                      aes(label = WY), size = 3, box.padding = 0.15,
+                      col = 'red')
+    b = b + 
+      geom_point(data = obsdat1 |> 
+                   filter(varname == 'flowt1' & WY %in% year_label),
+                 col = 'red') +
+      geom_text_repel(data = obsdat1 |> 
                         filter(varname == 'flowt1' & WY %in% year_label),
-                      aes(label = WY), size = 3, box.padding = 0.1)
-    c = c + geom_text_repel(data = obsdat1 |> 
+                      aes(label = WY), size = 3, box.padding = 0.15,
+                      col = 'red')
+    c = c + 
+      geom_point(data = obsdat1 |> 
+                   filter(varname == 'drought1' & WY %in% year_label),
+                 col = 'red') +
+      geom_text_repel(data = obsdat1 |> 
                         filter(varname == 'drought1' & WY %in% year_label),
-                      aes(label = WY), size = 3, box.padding = 0.1)
-    d = d + geom_text_repel(data = obsdat1 |> 
+                      aes(label = WY), size = 3, box.padding = 0.15,
+                      #point.size = NA, 
+                      col = 'red')
+    d = d + 
+      geom_point(data = obsdat1 |> 
+                   filter(varname == 'N' & WY %in% year_label),
+                 col = 'red') +
+      geom_text_repel(data = obsdat1 |> 
                         filter(varname == 'N' & WY %in% year_label),
-                      aes(label = WY), size = 3, box.padding = 0.1)
+                      aes(label = WY), size = 3, box.padding = 0.15,
+                      col = 'red')
     # does not apply to plot E
   }
   
@@ -215,6 +258,84 @@ plot_partial_effects = function(dat, obsdat,
   #   theme_classic() + guides(x = "none", y = "none")
   
   library(patchwork)
-  wrap_plots(a,b,c,d, ncol = 1, byrow = TRUE) +
-    plot_layout(axis_titles = 'collect', axes = 'collect')
+  wrap_plots(a,b,c,d, ncol = 1, byrow = TRUE) 
+}
+
+plot_effects = function(dat,
+                        type = c('bar', 'distribution'),
+                        mod = NULL,
+                        varnames = c('flowt', 'flowt1', 'drought1', 'N', 'WY')) {
+  
+  dat = dat |>  
+    select(varname, mean, lcl = `95%_HPDL`, ucl = `95%_HPDU`, pg0 = `p>0`) |> 
+    mutate(problab = paste0('P{\u03b2 > 0} = ', format(pg0, nsmall = 2)),
+           problab = if_else(round(pg0,2) >= 0.9 | round(pg0, 2) <= 0.1, 
+                             paste0(problab, '*'), problab),
+           varname = factor(varname, 
+                            levels = c('flowt', 'flowt1', 'drought1', 'N', 'WY')),
+           varlabels = recode(
+             varname,
+             flowt = 'Total stream flow\n(t, cfs, millions)', 
+             flowt1 = 'Prior total stream flow\n(t-1, cfs, millions)', 
+             drought1 = 'Breeding season drought\n(PDSI, t-1)', 
+             N = 'Prior burrow count\n(t-1)', 
+             WY = 'Water year')) |> 
+    arrange(varname)
+  
+  if (type == 'bar') {
+    ggplot(dat, aes(varlabels, mean)) +
+      geom_hline(aes(yintercept = 0), linetype = 'dashed') +
+      geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.25) +
+      geom_point() + 
+      scale_x_discrete(labels = parse(text = levels(df$varlabels))) +
+      geom_text(aes(y = ucl + 0.01, label = label), size = 4) +
+      labs(x = NULL, y = 'effect size') + 
+      theme_classic() +
+      theme(panel.grid = element_blank(),
+            axis.text = element_text(size = 10),
+            axis.title = element_text(size = 12))
+    
+  } else if (type == 'distribution') {
+
+    samples_df = MCMCvis::MCMCchains(mod, params = 'beta', ISB = TRUE) |> 
+      as_tibble() |> 
+      # original order of betas
+      set_names(c('flowt', 'flowt1', 'drought1', 'WY', 'N')) |> 
+      pivot_longer(everything(), names_to = 'varname') |> 
+      mutate(
+        varname = factor(varname, 
+                         levels = rev(c('flowt', 'flowt1', 'drought1', 'N', 'WY'))),
+        varlabels = recode(
+          varname,
+          flowt = 'Total stream flow\n(t, cfs, millions)', 
+          flowt1 = 'Prior total stream flow\n(t-1, cfs, millions)', 
+          drought1 = 'Breeding season drought\n(PDSI, t-1)', 
+          N = 'Prior burrow count\n(t-1)', 
+          WY = 'Water year'))
+
+    ggplot(samples_df, aes(y = varlabels)) +
+      ggridges::geom_density_ridges(
+        aes(x = value), scale = 0.95, rel_min_height = 0.01,
+        color = NA, fill = 'gray70') +
+      scale_y_discrete(#labels = function(x) str_wrap(x, width = 25),
+                       expand = expansion(add = 0.25)) +
+      geom_errorbar(data = dat, aes(xmin = lcl, xmax = ucl), width = 0.1) +
+      geom_point(data = dat, aes(x = mean)) +
+      geom_vline(data = dat, aes(xintercept = 0), linetype = 'dashed') +
+      xlim(-0.4, 0.4) +
+      labs(x = 'Effect size', y = NULL) +
+      theme_classic() +
+      theme(panel.grid = element_blank(),
+            axis.text.y = element_text(size = 10),
+            axis.text.x = element_text(size = 8),
+            axis.title = element_text(size = 10)) +
+      geom_text(data = dat |> filter(pg0 >= 0.5), 
+                aes(x = 0.01, label = paste0(round(pg0 * 100, 0), '%')), 
+                hjust = 0, vjust = 0, nudge_y = 0.08, size = 2.5) +
+      geom_text(data = dat |> filter(pg0 < 0.5),
+                aes(x = -0.01, label = paste0(round((1 - pg0) * 100, 0), '%')), 
+                hjust = 1, vjust = 0, nudge_y = 0.08, size = 2.5)
+    
+  }
+ 
 }
