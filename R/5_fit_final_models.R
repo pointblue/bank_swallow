@@ -123,3 +123,14 @@ model_stats = MCMCvis::MCMCsummary(mod_res_final,
   select(varname, everything())
 
 write_csv(model_stats, 'output/model_stats.csv')
+
+# Estimates of N and R
+N_est = MCMCvis::MCMCsummary(mod_res_final,  params = c('N'), HPD = TRUE) |> 
+  as_tibble(rownames = 'parameter') |> 
+  mutate(WY = c(1999:2023))
+N_est |> filter(WY == 2006)
+
+R_est = MCMCvis::MCMCsummary(mod_res_final,  params = c('R'), HPD = TRUE) |> 
+  as_tibble(rownames = 'parameter') |> 
+  mutate(WY = c(1999:2023))
+R_est |> filter(WY %in% c(2006, 2007))
