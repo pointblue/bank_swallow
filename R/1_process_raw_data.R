@@ -47,7 +47,10 @@ hmc = cdec_query('HMC', '41', 'D', start_date = '1993-01-01') #actual start: 200
 ord = cdec_query('ORD', '41', 'D', start_date = '1993-01-01')
 btc = cdec_query('BTC', '41', 'D', start_date = '1993-01-01') #now only starting 1998-01-01
 
-flowdat_raw = bind_rows(vin, hmc,ord,btc) |> 
+flowdat_raw = bind_rows(vin, hmc,ord,btc)
+write_csv(flowdat_raw, 'data/flowdat_raw.csv') #archive raw input data
+  
+flowdat_format = flowdat_raw |> 
   mutate(month = format(datetime, '%m') %>% as.numeric(),
          year = format(datetime, '%Y') %>% as.numeric(),
          WY = if_else(month < 10, year, year + 1),
@@ -56,12 +59,12 @@ flowdat_raw = bind_rows(vin, hmc,ord,btc) |>
   mutate(n = length(parameter_value[!is.na(parameter_value)])) %>%
   ungroup()
 
-flowdat_raw %>% select(location_id, WY, n) %>% distinct() %>% filter(n < 360) %>% 
+flowdat_format %>% select(location_id, WY, n) %>% distinct() %>% filter(n < 360) %>% 
   print(n = Inf)
 # >> lots of stations have less than 365 days of data in a WY
 
 # calculate mean value across stations each day
-flowdat_mean = flowdat_raw %>% 
+flowdat_mean = flowdat_format %>% 
   group_by(WY, month, date) %>% 
   summarize(nstations = length(parameter_value[!is.na(parameter_value)]), #note sometimes only 3 stations available per time step
             mflow = mean(parameter_value, na.rm = TRUE),
@@ -70,7 +73,7 @@ flowdat_mean = flowdat_raw %>%
 flowdat_mean %>% filter(nstations == 0) %>% arrange(date) %>% print(n = Inf)
 # many days in fall 1995 through winter 1996, plus a few days fall 2013, otherwise sporadic
 
-flowdat_raw |> 
+flowdat_format |> 
   filter(date >= '2022-10-01' & date <= '2023-09-30') |> 
   ggplot(aes(date, parameter_value)) + 
   geom_line(aes(color = location_id)) +
@@ -96,6 +99,53 @@ write_csv(flowdat_sum, 'data/flowdat.csv')
 
 # >> Note: originally explored seasonal flow totals, but annual totals highly
 # correlated with rainy season totals, and breeding season totals very low
+
+# characterize typical timing of annual flows (for inclusion in methods/study
+# area description)
+flowdat_month = flowdat_mean |> 
+  filter(WY >= 1999 & WY < 2024) |> 
+  mutate(mflow14 = if_else(mflow > 14000, mflow-14000, 0),
+         month_name = factor(month.abb[month],
+                             levels = month.abb[c(9:12,1:8)])) |> 
+  group_by(WY, month_name, month) |> 
+  summarize(mflow = sum(mflow, na.rm = TRUE),
+            mflow14 = sum(mflow14, na.rm = TRUE),
+            .groups = 'drop') |> 
+  group_by(WY) |> 
+  mutate(mflow_cum = cumsum(mflow),
+         mflow_tot = sum(mflow),
+         month_prop = mflow_cum/mflow_tot,
+         mflow14_cum = cumsum(mflow14),
+         mflow14_tot = sum(mflow14),
+         month_prop14 = if_else(mflow14_tot > 0, 
+                                mflow14_cum/mflow14_tot,
+                                NA))
+
+ggplot(flowdat_month, aes(month_name, mflow/1000000, group = as.factor(WY))) + 
+  geom_line(aes(color = as.factor(WY)))
+ggplot(flowdat_month, aes(month_name, mflow_cum/1000000, group = as.factor(WY))) + 
+  geom_line(aes(color = as.factor(WY)))
+ggplot(flowdat_month, aes(month_name, month_prop, group = as.factor(WY))) + 
+  geom_line(aes(color = as.factor(WY)))
+
+ggplot(flowdat_month, aes(month_name, mflow14/1000000, group = as.factor(WY))) + 
+  geom_line(aes(color = as.factor(WY)))
+ggplot(flowdat_month, aes(month_name, mflow14_cum/1000000, group = as.factor(WY))) + 
+  geom_line(aes(color = as.factor(WY)))
+ggplot(flowdat_month, aes(month_name, month_prop14, group = as.factor(WY))) + 
+  geom_line(aes(color = as.factor(WY)))
+
+
+# what proportion of cumulative total prior to May 1?
+flowdat_month |> 
+  select(WY, month_name, month, month_prop, month_prop14) |> 
+  filter(month == 4) |> 
+  pivot_longer(month_prop:month_prop14) |> 
+  group_by(name) |> 
+  summarize(value = mean(value, na.rm = TRUE))
+
+# month_prop   0.692
+# month_prop14 0.961
 
 
 # 2. Breeding season conditions---------
