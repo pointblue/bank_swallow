@@ -1,34 +1,3 @@
-plot_covariates = function(df, minyear = 1999) {
-  
-  a = ggplot(df |> filter(WY >= minyear), aes(WY, flowt)) + 
-    geom_line() + geom_point() +
-    labs(x = NULL, y = 'cfs (millions)') + 
-    scale_y_continuous(breaks = seq(0, 10, 2), 
-                       limits = c(0, 10)) +
-    scale_x_continuous(breaks = seq(1999, 2023, 2),
-                       minor_breaks = seq(2000, 2022, 2),
-                       labels = NULL,
-                       guide = guide_axis(minor.ticks = TRUE)) +
-    theme_classic()
-  
-  b = ggplot(df |> filter(WY >= minyear), aes(WY, drought)) + 
-    geom_line() + geom_point() +
-    labs(x = NULL, y = 'PDSI') + 
-    geom_hline(aes(yintercept = -2), linetype = 'dashed') +
-    geom_hline(aes(yintercept = 2), linetype = 'dashed') +
-    scale_x_continuous(breaks = seq(1999, 2023, 2),
-                       minor_breaks = seq(2000, 2022, 2),
-                       labels = seq(1999, 2023, 2),
-                       guide = guide_axis(minor.ticks = TRUE)) +
-    scale_y_continuous(limits = c(-6,6), 
-                       breaks = seq(-6, 6, 2)) +
-    theme_classic()
-  
-  library(patchwork)
-  a/b + plot_layout(axes = 'collect', guides = 'collect') +
-    plot_annotation(tag_levels = 'A')
-}
-
 plot_observed_predicted = function(mod, obsdat, params = c('N', 'R'), 
                                    years = c(1999:2023), exclude99 = TRUE, 
                                    colorval = c('observed' = 'red', 'model' = 'black'),
@@ -54,14 +23,19 @@ plot_observed_predicted = function(mod, obsdat, params = c('N', 'R'),
     geom_point(aes(color = source, shape = source)) + 
     scale_color_manual(values = colorval) +
     scale_fill_manual(values = fillval) +
-    theme_bw() + 
-    scale_x_continuous(breaks = seq(1999, 2023, 2),
+    scale_x_continuous(limits = c(1999, 2023),
+                       breaks = seq(1999, 2023, 2),
                        minor_breaks = seq(2000, 2022, 2),
                        labels = NULL,
+                       #labels = seq(1999, 2023, 2),
                        guide = guide_axis(minor.ticks = TRUE)) +
     scale_y_continuous(limits = c(0, 30), expand = c(0, 0)) +
+    theme_classic() + 
     theme(panel.grid = element_blank(), 
           legend.position = 'none',
+          axis.text = element_text(size = 8),
+          axis.title = element_text(size = 10),
+          axis.ticks.length = unit(5, 'points'),
           axis.minor.ticks.length = rel(0.5)) +
     labs(y = 'Burrow count (thousands)', x = NULL)
   
@@ -71,21 +45,144 @@ plot_observed_predicted = function(mod, obsdat, params = c('N', 'R'),
     geom_point(aes(color = source, shape = source)) + 
     scale_color_manual(values = colorval) +
     scale_fill_manual(values = fillval) +
-    theme_bw() + 
-    scale_x_continuous(breaks = seq(1999, 2023, 2),
+    theme_classic() + 
+    scale_x_continuous(limits = c(1999, 2023),
+                       breaks = seq(1999, 2023, 2),
                        minor_breaks = seq(2000, 2022, 2),
                        labels = seq(1999, 2023, 2),
                        guide = guide_axis(minor.ticks = TRUE)) +
     scale_y_continuous(limits = c(0, 2.5), expand = c(0, 0)) +
     theme(panel.grid = element_blank(), 
           legend.position = 'none',
+          axis.text = element_text(size = 8),
+          axis.title = element_text(size = 10),
+          axis.ticks.length = unit(5, 'points'),
           axis.minor.ticks.length = rel(0.5)) +
     labs(y = 'Annual growth rate (%)', x = NULL) +
     geom_hline(aes(yintercept = 1), linetype = 'dashed')
   
   library(patchwork)
+  a/b + 
+    plot_layout(guides = 'collect') +
+    plot_annotation(tag_levels = 'A')
+}
+
+plot_covariates = function(df, minyear = 1999) {
+  
+  a = ggplot(df |> filter(WY >= minyear), aes(WY, flowt)) + 
+    geom_line() + geom_point() +
+    labs(x = NULL, y = 'cfs (millions)') + 
+    scale_y_continuous(breaks = seq(0, 10, 2), 
+                       limits = c(0, 10)) +
+    scale_x_continuous(breaks = seq(1999, 2023, 2),
+                       minor_breaks = seq(2000, 2022, 2),
+                       labels = NULL,
+                       guide = guide_axis(minor.ticks = TRUE)) +
+    theme_classic() +
+    theme(axis.text = element_text(size = 8),
+          axis.title = element_text(size = 10),
+          axis.ticks.length = unit(5, 'points'),
+          axis.minor.ticks.length = rel(0.5))
+  
+  b = ggplot(df |> filter(WY >= minyear), aes(WY, drought)) + 
+    geom_line() + geom_point() +
+    labs(x = NULL, y = 'PDSI') + 
+    geom_hline(aes(yintercept = -2), linetype = 'dashed') +
+    geom_hline(aes(yintercept = 2), linetype = 'dashed') +
+    scale_x_continuous(breaks = seq(1999, 2023, 2),
+                       minor_breaks = seq(2000, 2022, 2),
+                       labels = seq(1999, 2023, 2),
+                       guide = guide_axis(minor.ticks = TRUE)) +
+    scale_y_continuous(limits = c(-6,6), 
+                       breaks = seq(-6, 6, 2)) +
+    theme_classic() +
+    theme(axis.text = element_text(size = 8),
+          axis.title = element_text(size = 10),
+          axis.ticks.length = unit(5, 'points'),
+          axis.minor.ticks.length = rel(0.5))
+  
+  library(patchwork)
   a/b + plot_layout(axes = 'collect', guides = 'collect') +
     plot_annotation(tag_levels = 'A')
+}
+
+plot_effects = function(dat,
+                        type = c('bar', 'distribution'),
+                        mod = NULL,
+                        varnames = c('flowt', 'flowt1', 'drought1', 'N', 'WY')) {
+  
+  dat = dat |>  
+    select(varname, mean, lcl = `95%_HPDL`, ucl = `95%_HPDU`, pg0 = `p>0`) |> 
+    mutate(problab = paste0('P{\u03b2 > 0} = ', format(pg0, nsmall = 2)),
+           problab = if_else(round(pg0,2) >= 0.9 | round(pg0, 2) <= 0.1, 
+                             paste0(problab, '*'), problab),
+           varname = factor(varname, 
+                            levels = c('flowt', 'flowt1', 'drought1', 'N', 'WY')),
+           varlabels = recode(
+             varname,
+             flowt = 'Total stream flow\n(t, cfs, millions)', 
+             flowt1 = 'Prior total stream flow\n(t-1, cfs, millions)', 
+             drought1 = 'Breeding season drought\n(PDSI, t-1)', 
+             N = 'Prior burrow count\n(t-1)', 
+             WY = 'Water year')) |> 
+    arrange(varname)
+  
+  if (type == 'bar') {
+    ggplot(dat, aes(varlabels, mean)) +
+      geom_hline(aes(yintercept = 0), linetype = 'dashed') +
+      geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.25) +
+      geom_point() + 
+      scale_x_discrete(labels = parse(text = levels(df$varlabels))) +
+      geom_text(aes(y = ucl + 0.01, label = label), size = 4) +
+      labs(x = NULL, y = 'effect size') + 
+      theme_classic() +
+      theme(panel.grid = element_blank(),
+            axis.text = element_text(size = 10),
+            axis.title = element_text(size = 12))
+    
+  } else if (type == 'distribution') {
+    
+    samples_df = MCMCvis::MCMCchains(mod, params = 'beta', ISB = TRUE) |> 
+      as_tibble() |> 
+      # original order of betas
+      set_names(c('flowt', 'flowt1', 'drought1', 'WY', 'N')) |> 
+      pivot_longer(everything(), names_to = 'varname') |> 
+      mutate(
+        varname = factor(varname, 
+                         levels = rev(c('flowt', 'flowt1', 'drought1', 'N', 'WY'))),
+        varlabels = recode(
+          varname,
+          flowt = 'Total stream flow\n(t, cfs, millions)', 
+          flowt1 = 'Prior total stream flow\n(t-1, cfs, millions)', 
+          drought1 = 'Breeding season drought\n(PDSI, t-1)', 
+          N = 'Prior burrow count\n(t-1)', 
+          WY = 'Water year'))
+    
+    ggplot(samples_df, aes(y = varlabels)) +
+      ggridges::geom_density_ridges(
+        aes(x = value), scale = 0.95, rel_min_height = 0.01,
+        color = NA, fill = 'gray70') +
+      scale_y_discrete(#labels = function(x) str_wrap(x, width = 25),
+        expand = expansion(add = 0.25)) +
+      geom_errorbar(data = dat, aes(xmin = lcl, xmax = ucl), width = 0.1) +
+      geom_point(data = dat, aes(x = mean)) +
+      geom_vline(data = dat, aes(xintercept = 0), linetype = 'dashed') +
+      xlim(-0.4, 0.4) +
+      labs(x = 'Effect size', y = NULL) +
+      theme_classic() +
+      theme(panel.grid = element_blank(),
+            axis.text.y = element_text(size = 10),
+            axis.text.x = element_text(size = 8),
+            axis.title = element_text(size = 10)) +
+      geom_text(data = dat |> filter(pg0 >= 0.5), 
+                aes(x = 0.01, label = paste0(round(pg0 * 100, 0), '%')), 
+                hjust = 0, vjust = 0, nudge_y = 0.08, size = 2.5) +
+      geom_text(data = dat |> filter(pg0 < 0.5),
+                aes(x = -0.01, label = paste0(round((1 - pg0) * 100, 0), '%')), 
+                hjust = 1, vjust = 0, nudge_y = 0.08, size = 2.5)
+    
+  }
+  
 }
 
 compile_partial_effects = function(mod, param = 'R.pred', covariates, predicted) {
@@ -155,7 +252,7 @@ plot_partial_effects = function(dat, obsdat,
     geom_line(),
     geom_hline(aes(yintercept = 1), linetype = 'dashed'),
     scale_y_continuous(limits = ylim, expand = c(0, 0)),
-    theme_bw(),
+    theme_classic(),
     theme(panel.grid = element_blank(),
           strip.background = element_blank(),
           strip.text = element_text(hjust = 0),
@@ -261,81 +358,3 @@ plot_partial_effects = function(dat, obsdat,
   wrap_plots(a,b,c,d, ncol = 1, byrow = TRUE) 
 }
 
-plot_effects = function(dat,
-                        type = c('bar', 'distribution'),
-                        mod = NULL,
-                        varnames = c('flowt', 'flowt1', 'drought1', 'N', 'WY')) {
-  
-  dat = dat |>  
-    select(varname, mean, lcl = `95%_HPDL`, ucl = `95%_HPDU`, pg0 = `p>0`) |> 
-    mutate(problab = paste0('P{\u03b2 > 0} = ', format(pg0, nsmall = 2)),
-           problab = if_else(round(pg0,2) >= 0.9 | round(pg0, 2) <= 0.1, 
-                             paste0(problab, '*'), problab),
-           varname = factor(varname, 
-                            levels = c('flowt', 'flowt1', 'drought1', 'N', 'WY')),
-           varlabels = recode(
-             varname,
-             flowt = 'Total stream flow\n(t, cfs, millions)', 
-             flowt1 = 'Prior total stream flow\n(t-1, cfs, millions)', 
-             drought1 = 'Breeding season drought\n(PDSI, t-1)', 
-             N = 'Prior burrow count\n(t-1)', 
-             WY = 'Water year')) |> 
-    arrange(varname)
-  
-  if (type == 'bar') {
-    ggplot(dat, aes(varlabels, mean)) +
-      geom_hline(aes(yintercept = 0), linetype = 'dashed') +
-      geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.25) +
-      geom_point() + 
-      scale_x_discrete(labels = parse(text = levels(df$varlabels))) +
-      geom_text(aes(y = ucl + 0.01, label = label), size = 4) +
-      labs(x = NULL, y = 'effect size') + 
-      theme_classic() +
-      theme(panel.grid = element_blank(),
-            axis.text = element_text(size = 10),
-            axis.title = element_text(size = 12))
-    
-  } else if (type == 'distribution') {
-
-    samples_df = MCMCvis::MCMCchains(mod, params = 'beta', ISB = TRUE) |> 
-      as_tibble() |> 
-      # original order of betas
-      set_names(c('flowt', 'flowt1', 'drought1', 'WY', 'N')) |> 
-      pivot_longer(everything(), names_to = 'varname') |> 
-      mutate(
-        varname = factor(varname, 
-                         levels = rev(c('flowt', 'flowt1', 'drought1', 'N', 'WY'))),
-        varlabels = recode(
-          varname,
-          flowt = 'Total stream flow\n(t, cfs, millions)', 
-          flowt1 = 'Prior total stream flow\n(t-1, cfs, millions)', 
-          drought1 = 'Breeding season drought\n(PDSI, t-1)', 
-          N = 'Prior burrow count\n(t-1)', 
-          WY = 'Water year'))
-
-    ggplot(samples_df, aes(y = varlabels)) +
-      ggridges::geom_density_ridges(
-        aes(x = value), scale = 0.95, rel_min_height = 0.01,
-        color = NA, fill = 'gray70') +
-      scale_y_discrete(#labels = function(x) str_wrap(x, width = 25),
-                       expand = expansion(add = 0.25)) +
-      geom_errorbar(data = dat, aes(xmin = lcl, xmax = ucl), width = 0.1) +
-      geom_point(data = dat, aes(x = mean)) +
-      geom_vline(data = dat, aes(xintercept = 0), linetype = 'dashed') +
-      xlim(-0.4, 0.4) +
-      labs(x = 'Effect size', y = NULL) +
-      theme_classic() +
-      theme(panel.grid = element_blank(),
-            axis.text.y = element_text(size = 10),
-            axis.text.x = element_text(size = 8),
-            axis.title = element_text(size = 10)) +
-      geom_text(data = dat |> filter(pg0 >= 0.5), 
-                aes(x = 0.01, label = paste0(round(pg0 * 100, 0), '%')), 
-                hjust = 0, vjust = 0, nudge_y = 0.08, size = 2.5) +
-      geom_text(data = dat |> filter(pg0 < 0.5),
-                aes(x = -0.01, label = paste0(round((1 - pg0) * 100, 0), '%')), 
-                hjust = 1, vjust = 0, nudge_y = 0.08, size = 2.5)
-    
-  }
- 
-}
