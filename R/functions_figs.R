@@ -1,7 +1,10 @@
 plot_observed_predicted = function(mod, obsdat, params = c('N', 'R'), 
                                    years = c(1999:2023), exclude99 = TRUE, 
                                    colorval = c('observed' = 'red', 'model' = 'black'),
-                                   fillval = c('model' = 'gray70'), ...) {
+                                   fillval = c('model' = 'gray70'), 
+                                   Rmethod = c('ratio', '%'), 
+                                   ylim1 = c(0, 30), ylim2 = c(0, 2.5),
+                                   ...) {
   
   preddat = MCMCvis::MCMCsummary(mod, params = params, ...) |> 
     as_tibble(rownames = 'var', .name_repair = 'universal') |> 
@@ -13,10 +16,16 @@ plot_observed_predicted = function(mod, obsdat, params = c('N', 'R'),
     bind_rows(obsdat |> select(WY, N = burrows_orig, R = agr) |> 
                 mutate(source = 'observed') |> 
                 pivot_longer(N:R, names_to = 'var', values_to = 'mean'))
+  
   if (exclude99) {
     preddat = preddat |> filter(!(var == 'R' & WY == '1999'))
   }
   
+  if (Rmethod == '%') {
+    preddat = preddat |> 
+      mutate(across(c(mean, lci, uci), 
+                    ~if_else(var == 'R', (.x - 1) * 100, .x)))
+  }
   a = ggplot(preddat |> filter(var == 'N'), aes(WY, mean/1000)) + 
     geom_ribbon(aes(ymin = lci/1000, ymax = uci/1000, fill = source), alpha = 0.5) +
     geom_line(aes(color = source)) + 
@@ -29,7 +38,7 @@ plot_observed_predicted = function(mod, obsdat, params = c('N', 'R'),
                        labels = NULL,
                        #labels = seq(1999, 2023, 2),
                        guide = guide_axis(minor.ticks = TRUE)) +
-    scale_y_continuous(limits = c(0, 30), expand = c(0, 0)) +
+    scale_y_continuous(limits = ylim1, expand = c(0, 0)) +
     theme_classic() + 
     theme(panel.grid = element_blank(), 
           legend.position = 'none',
@@ -51,7 +60,7 @@ plot_observed_predicted = function(mod, obsdat, params = c('N', 'R'),
                        minor_breaks = seq(2000, 2022, 2),
                        labels = seq(1999, 2023, 2),
                        guide = guide_axis(minor.ticks = TRUE)) +
-    scale_y_continuous(limits = c(0, 2.5), expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0), limits = ylim2) +
     theme(panel.grid = element_blank(), 
           legend.position = 'none',
           axis.text = element_text(size = 8),
@@ -185,7 +194,9 @@ plot_effects = function(dat,
   
 }
 
-compile_partial_effects = function(mod, param = 'R.pred', covariates, predicted) {
+compile_partial_effects = function(mod, param = 'R.pred', 
+                                   covariates, predicted,
+                                   Rmethod = c('ratio', '%')) {
   
   scale_params = tibble(
     varname = covariates |> names(),
@@ -212,7 +223,7 @@ compile_partial_effects = function(mod, param = 'R.pred', covariates, predicted)
     as_tibble(rownames = 'var') |> 
     mutate(varname = names(predicted))
     
-  MCMCvis::MCMCsummary(mod, param = param, HPD = TRUE) |> 
+  res <- MCMCvis::MCMCsummary(mod, param = param, HPD = TRUE) |> 
     as_tibble(rownames = 'var', .name_repair = 'universal') |> 
     rename(lci = `..95._HPDL`, uci = `..95._HPDU`) |> 
     mutate(var = gsub('\\[.*$', '', var),
@@ -223,13 +234,17 @@ compile_partial_effects = function(mod, param = 'R.pred', covariates, predicted)
     left_join(modsum |> select(varname, pg0 = `p>0`), by = 'varname') |> 
     mutate(varname = gsub('log.', '', varname))
     
-  
+  if (Rmethod == '%') {
+    res = res |> 
+      mutate(across(c(mean, lci, uci), ~(.x - 1) * 100))
+  }
+  return(res)
 }
 
 plot_partial_effects = function(dat, obsdat, 
                                 #var.order = c('flowt', 'flowt1', 'drought1', 'N', 'WY'),
-                                var.label = c('Total stream flow (t, cfs, millions)', 
-                                              'Prior total stream flow (t-1, cfs, millions)',
+                                var.label = c('Total streamflow (t, cfs, millions)', 
+                                              'Prior total streamflow (t-1, cfs, millions)',
                                               'Prior breeding season drought (t-1, PDSI)',
                                               'Prior burrow count (t-1, thousands)'),
                                 labels = c('A', 'B', 'C', 'D', 'E'),
