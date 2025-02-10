@@ -10,7 +10,8 @@ model_stats = read_csv('output/model_stats.csv')
 
 # Fig 3: observed vs. predicted-----------
 # growth rates and burrow counts
-plot_observed_predicted(mod_res_final, obsdat = modeldat, HPD = TRUE, pg0 = TRUE)
+plot_observed_predicted(mod_res_final, obsdat = modeldat, 
+                        HPD = TRUE, pg0 = TRUE, Rmethod = '%', ylim2 = c(-60, 110))
 ggsave(filename = 'fig/observed_predicted.png', width = 6.5, height = 5, units = 'in')
 
 # Fig 4: covariates-----------
@@ -32,14 +33,19 @@ model_stats |> filter(grepl('beta', var)) |>
   plot_effects(type = 'distribution', mod = mod_res_final)
 ggsave(filename = 'fig/effect_size.png', width = 5.5, height = 4, units = 'in')
 
-# partial effects plots---------
+# Fig 6: partial effects plots---------
 # original predictor values from inputdat1
 partial_effects = compile_partial_effects(mod_res_final, param = 'R.pred',
                                           covariates = inputdat_final$predictors, 
-                                          predicted = inputdat_final$predmatrix)
+                                          predicted = inputdat_final$predmatrix,
+                                          Rmethod = '%')
 
-plot_partial_effects(partial_effects, obsdat = modeldat, ylim = c(0.5, 1.7),
-                     year_label = c(2001, 2010, 2015, 2017, 2018, 2022, 2023), 
+plot_partial_effects(partial_effects, 
+                     obsdat = modeldat |> mutate(agr = (agr - 1) * 100), 
+                     ylim = c(-50, 70),
+                     #ylim = c(0.5, 1.7),
+                     year_label = FALSE,
+                     #year_label = c(2001, 2010, 2015, 2017, 2018, 2022, 2023), 
                      pg0 = FALSE)
 ggsave(filename = 'fig/partial_effects.png', width = 5.5, height = 7.5, units = 'in')
 
