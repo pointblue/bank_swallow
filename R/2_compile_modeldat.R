@@ -45,28 +45,28 @@ exp(mean(log(birddat$agr), na.rm = TRUE)) # mean = 0.978
 
 flowdat = read_csv('data/flowdat.csv') |> 
   filter(WY != 2024) |> # drop incomplete water year
-  select(WY, flowt = flowtotal, flow14t = flowtotal_threshold) |> 
+  select(WY, flowt = flowtotal, flow15t = flowtotal_threshold) |> 
   # # extend to 2024--2026
   # bind_rows(tibble(WY = c(2024:2026))) |> 
   # find lag values
   mutate(flowt1 = lag(flowt),
          flowt2 = lag(flowt, n = 2),
          flowt3 = lag(flowt, n = 3),
-         flow14t1 = lag(flow14t),
-         flow14t2 = lag(flow14t, n = 2),
-         flow14t3 = lag(flow14t, n = 3),
+         flow15t1 = lag(flow15t),
+         flow15t2 = lag(flow15t, n = 2),
+         flow15t3 = lag(flow15t, n = 3),
          # convert to cfs (millions)
          across(matches('^flow'), ~./1000000)) |> 
   # add log transformations
   mutate(across(matches('^flowt'), ~log(.), .names = 'log.{col}'),
-         across(matches('^flow14'), ~log(. + 1), .names = 'log.{col}')) |> 
+         across(matches('^flow15'), ~log(. + 1), .names = 'log.{col}')) |> 
   filter(WY >= 1999) # match to birddat
 
 # check correlations:
 corrplot::corrplot.mixed(
   cor(flowdat |> drop_na(), method = 'pearson'),
   order = 'hclust', tl.col = 'black', tl.pos = 'lt')
-# > flowt, flow14t, and log versions all highly correlated (>0.95)
+# > flowt, flow15t, and log versions all highly correlated (>0.95)
 # > all flow data moderately negatively correlated with WY
 # > flow and lagged flow values not correlated
 

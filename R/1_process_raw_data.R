@@ -86,8 +86,8 @@ flowdat_sum = flowdat_mean %>%
   group_by(WY) %>% 
   summarize(ndays = length(mflow[!is.na(mflow)]),
             flowtotal = sum(mflow, na.rm = TRUE),
-            ndays_threshold = length(mflow[mflow > 14000 & !is.na(mflow)]),
-            flowtotal_threshold = sum(mflow[mflow > 14000], na.rm = TRUE),
+            ndays_threshold = length(mflow[mflow > 15000 & !is.na(mflow)]),
+            flowtotal_threshold = sum(mflow[mflow > 15000], na.rm = TRUE),
             .groups = 'drop')
 
 flowdat_sum %>% filter(ndays < 365)
@@ -105,11 +105,13 @@ write_csv(flowdat_sum, 'data/flowdat.csv')
 flowdat_month = flowdat_mean |> 
   filter(WY >= 1999 & WY < 2024) |> 
   mutate(mflow14 = if_else(mflow > 14000, mflow-14000, 0),
+         mflow15 = if_else(mflow > 15000, mflow-15000, 0),
          month_name = factor(month.abb[month],
                              levels = month.abb[c(9:12,1:8)])) |> 
   group_by(WY, month_name, month) |> 
   summarize(mflow = sum(mflow, na.rm = TRUE),
             mflow14 = sum(mflow14, na.rm = TRUE),
+            mflow15 = sum(mflow15, na.rm = TRUE),
             .groups = 'drop') |> 
   group_by(WY) |> 
   mutate(mflow_cum = cumsum(mflow),
@@ -119,6 +121,11 @@ flowdat_month = flowdat_mean |>
          mflow14_tot = sum(mflow14),
          month_prop14 = if_else(mflow14_tot > 0, 
                                 mflow14_cum/mflow14_tot,
+                                NA),
+         mflow15_cum = cumsum(mflow15),
+         mflow15_tot = sum(mflow15),
+         month_prop15 = if_else(mflow15_tot > 0, 
+                                mflow15_cum/mflow15_tot,
                                 NA))
 
 ggplot(flowdat_month, aes(month_name, mflow/1000000, group = as.factor(WY))) + 
@@ -138,14 +145,15 @@ ggplot(flowdat_month, aes(month_name, month_prop14, group = as.factor(WY))) +
 
 # what proportion of cumulative total prior to May 1?
 flowdat_month |> 
-  select(WY, month_name, month, month_prop, month_prop14) |> 
+  select(WY, month_name, month, month_prop, month_prop14, month_prop15) |> 
   filter(month == 4) |> 
-  pivot_longer(month_prop:month_prop14) |> 
+  pivot_longer(month_prop:month_prop15) |> 
   group_by(name) |> 
   summarize(value = mean(value, na.rm = TRUE))
 
 # month_prop   0.692
 # month_prop14 0.961
+# month_prop15 0.964
 
 
 # 2. Breeding season conditions---------
