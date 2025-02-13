@@ -107,7 +107,7 @@ flowdat_month = flowdat_mean |>
   mutate(mflow14 = if_else(mflow > 14000, mflow-14000, 0),
          mflow15 = if_else(mflow > 15000, mflow-15000, 0),
          month_name = factor(month.abb[month],
-                             levels = month.abb[c(9:12,1:8)])) |> 
+                             levels = month.abb[c(10:12,1:9)])) |> 
   group_by(WY, month_name, month) |> 
   summarize(mflow = sum(mflow, na.rm = TRUE),
             mflow14 = sum(mflow14, na.rm = TRUE),
@@ -143,18 +143,21 @@ ggplot(flowdat_month, aes(month_name, month_prop14, group = as.factor(WY))) +
   geom_line(aes(color = as.factor(WY)))
 
 
-# what proportion of cumulative total prior to May 1?
+# what proportion of cumulative total prior to Apr 1?
 flowdat_month |> 
   select(WY, month_name, month, month_prop, month_prop14, month_prop15) |> 
-  filter(month == 4) |> 
+  filter(month == 3) |> 
   pivot_longer(month_prop:month_prop15) |> 
   group_by(name) |> 
-  summarize(value = mean(value, na.rm = TRUE))
+  summarize(mean = mean(value, na.rm = TRUE),
+            min = min(value, na.rm = TRUE),
+            max = max(value, na.rm = TRUE),
+            sd = sd(value, na.rm = TRUE))
 
-# month_prop   0.692
-# month_prop14 0.961
-# month_prop15 0.964
-
+# means:
+# month_prop   0.547
+# month_prop14 0.880
+# month_prop15 0.883
 
 # 2. Breeding season conditions---------
 # loss of foraging habitat for BANS (and more broadly, aerial insectivores) is
