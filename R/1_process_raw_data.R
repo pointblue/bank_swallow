@@ -19,7 +19,25 @@ write_csv(birddat, 'data/birddat.csv')
 # Note: no count data from 2006, so no agr/pgr calculated for 2005-06 or 2006-07
 # intervals
 
-ggplot(birddat, aes(year, burrows)) + geom_line() + geom_point() + ylim(0, NA)
+ggplot(birddat, aes(year, burrows)) + 
+  geom_line() + geom_point() + ylim(0, NA) +
+  geom_smooth()
+ggplot(birddat |> filter(year >= 1999), aes(year, burrows)) + 
+  geom_line() + geom_point() + ylim(0, NA) +
+  geom_smooth()
+ggplot(birddat |> filter(year >= 1999), aes(year, burrows)) + 
+  geom_line() + geom_point() + ylim(0, NA) +
+  geom_smooth(method = 'lm')
+ggplot(birddat |> filter(year >= 1999), aes(year, log(burrows))) + 
+  geom_line() + geom_point() + #ylim(0, NA) +
+  geom_smooth(method = 'lm')
+
+# long-term trend: (1999-2023)
+# log-normal because burrow counts are not all integers:
+m = lm(log(burrows) ~ year, birddat |> filter(year >= 1999) |> drop_na())
+summary(m)
+(exp(m$coefficients['year'])-1)*100 #-1.49% per year; p = 0.027
+
 
 # COVARIATES---------
 # Focus on effects of environmental conditions on reproductive success, and
