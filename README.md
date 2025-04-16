@@ -1,4 +1,4 @@
-# Bank Swallow
+# Bank Swallow population dynamics & river flow
 
 <!-- badges: start -->
 
@@ -10,5 +10,13 @@ based on annual burrow count surveys (1999-2023). Evaluation of effects
 of river flow (including lagged effects), drought indices, and density
 dependence on annual population growth rates.
 
-Contact: Kristen Dybala (Point Blue), Greg Golet (The Nature
-Conservancy)
+## Manuscript
+
+Golet GH, Dybala KE, Silveira JG, Henderson A, Isola JE, Wright DH,
+Melcer Jr R, Tsao D (In press) The importance of high streamflow and
+meander migration for the Bank Swallow, a sentinel species of alluvial
+river systems. *Ecological Indicators*
+
+## Contacts
+
+Kristen Dybala (Point Blue), Greg Golet (The Nature Conservancy)

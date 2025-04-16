@@ -5,7 +5,7 @@ output:
     variant: gfm
 ---
 
-Bank Swallow
+Bank Swallow population dynamics & river flow
 ======================================
 
 <!-- badges: start -->
@@ -14,6 +14,9 @@ Bank Swallow
 
 Analysis of Bank Swallow population dynamics on the Sacramento River, based on annual burrow count surveys (1999-2023). Evaluation of effects of river flow (including lagged effects), drought indices, and density dependence on annual population growth rates.
 
+## Manuscript
+Golet GH, Dybala KE, Silveira JG, Henderson A, Isola JE, Wright DH, Melcer Jr R, Tsao D (In press) The importance of high streamflow and meander migration for the Bank Swallow, a sentinel species of alluvial river systems. *Ecological Indicators*
 
-Contact: Kristen Dybala (Point Blue), Greg Golet (The Nature Conservancy)
+## Contacts
+Kristen Dybala (Point Blue), Greg Golet (The Nature Conservancy)
 
