@@ -70,6 +70,21 @@ mod_res_final = rjags::coda.samples(
   n.iter = 100000, thin = 25)
 save(inputdat_final, mod_res_final, file = 'output/model_results.RData')
 
+betas = tidybayes::tidy_draws(mod_res_final) |> 
+  select(.chain:.draw, rmax, starts_with('beta'))
+write_csv(betas, 'output/draws_betas.csv')
+
+burrows = tidybayes::gather_draws(mod_res_final, N[t], N.sim[t], y.sim[t]) |> 
+  pivot_wider(names_from = .variable, values_from = .value) |> 
+  select(.chain:.draw, t, everything())
+write_csv(burrows, 'output/draws_burrows.csv')
+
+growth = tidybayes::gather_draws(mod_res_final, R[t], R.sim[t]) |> 
+  pivot_wider(names_from = .variable, values_from = .value) |> 
+  select(.chain:.draw, t, everything())
+write_csv(burrows, 'output/draws_growth.csv')
+
+
 ## INSPECT OUTPUT-------
 # model parameters:
 MCMCvis::MCMCsummary(mod_res_final, 
