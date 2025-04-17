@@ -2,6 +2,7 @@
 
 <!-- badges: start -->
 
+[![DOI](https://zenodo.org/badge/329090744.svg)](https://doi.org/10.5281/zenodo.15233093)
 [![RStudio](https://img.shields.io/badge/RStudio-project-75AADB.svg?style=flat&logo=RStudio)](https://www.rstudio.com)
 <!-- badges: end -->
 
