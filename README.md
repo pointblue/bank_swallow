@@ -14,9 +14,10 @@ dependence on annual population growth rates.
 ## Manuscript
 
 Golet GH, Dybala KE, Silveira JG, Henderson A, Isola JE, Wright DH,
-Melcer Jr R, Tsao D (In press) The importance of high streamflow and
-meander migration for the Bank Swallow, a sentinel species of alluvial
-river systems. *Ecological Indicators*
+Melcer Jr R, Tsao D (2025) The importance of high streamflow and meander
+migration for the Bank Swallow, a sentinel species of alluvial river
+systems. *Ecological Indicators* 174:113460. DOI:
+[10.1016/j.ecolind.2025.113460](https://doi.org/10.1016/j.ecolind.2025.113460)
 
 ## Contacts
 
